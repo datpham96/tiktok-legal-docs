@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Agent Scene</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 1080px;
+            height: 1920px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        .scene {
+            text-align: center;
+            color: white;
+            max-width: 90%;
+        }
+        .title {
+            font-size: 72px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .subtitle {
+            font-size: 48px;
+            opacity: 0.9;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .emoji {
+            font-size: 120px;
+            margin-bottom: 40px;
+        }
+        .tag {
+            position: absolute;
+            bottom: 80px;
+            font-size: 36px;
+            color: rgba(255,255,255,0.7);
+        }
+    </style>
+</head>
+<body>
+    <div class="scene">
+        <div class="emoji" id="emoji">🤖</div>
+        <div class="title" id="title">AI Agent</div>
+        <div class="subtitle" id="subtitle">Tương lai của tự động hóa</div>
+        <div class="tag">#AIAgent #AI #TựĐộngHóa</div>
+    </div>
+    <script>
+        // Scene config
+        const scenes = [
+            { emoji: "🤖", title: "AI Agent", subtitle: "Trợ lý ảo thông minh" },
+            { emoji: "⚡", title: "Tự động hóa", subtitle: "Tiết kiệm 80% thời gian" },
+            { emoji: "🧠", title: "Học liên tục", subtitle: "Thích ứng nhanh với nhiệm vụ mới" },
+            { emoji: "🚀", title: "Tương lai", subtitle: "Chuẩn bị cho thế giới tự động" }
+        ];
+
+        // Set scene from URL param
+        const urlParams = new URLSearchParams(window.location.search);
+        const sceneIndex = parseInt(urlParams.get('scene') || '0');
+        const scene = scenes[sceneIndex] || scenes[0];
+
+        document.getElementById('emoji').textContent = scene.emoji;
+        document.getElementById('title').textContent = scene.title;
+        document.getElementById('subtitle').textContent = scene.subtitle;
+    </script>
+</body>
+</html>

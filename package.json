@@ -1,0 +1,42 @@
+{
+  "name": "tiktok-auto-publish-mvp",
+  "version": "1.0.0",
+  "description": "MVP for automated TikTok video publishing using TikTok Content Posting API",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/server.ts",
+    "start": "node dist/server.js",
+    "generate-video": "ts-node src/video-generator.ts",
+    "generate-slideshow": "ts-node src/slideshow-cli.ts",
+    "demo-video": "ts-node src/demo-topic-video.ts",
+    "demo-simple": "ts-node src/demo-simple.ts",
+    "demo-ai-agent": "ts-node src/demo-ai-agent.ts",
+    "auto-content": "ts-node src/auto-content.ts",
+    "test-image": "ts-node src/test-image.ts",
+    "test-caption": "ts-node src/test-caption.ts",
+    "test-all": "ts-node src/test-all.ts",
+    "publish": "ts-node src/index.ts",
+    "test-flow": "npm run generate-video && npm run publish"
+  },
+  "keywords": [
+    "tiktok",
+    "automation",
+    "content-posting",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.8",
+    "canvas": "^3.2.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
