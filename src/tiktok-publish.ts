@@ -120,8 +120,12 @@ async function initializeUpload(
     }
   );
 
-  if (response.data.error) {
+  if (response.data.error && response.data.error.code !== 'ok') {
     throw new Error(`Init upload error: ${response.data.error.code} - ${response.data.error.message}`);
+  }
+
+  if (!response.data.data?.publish_id || !response.data.data?.upload_url) {
+    throw new Error(`Init upload response missing publish_id/upload_url: ${JSON.stringify(response.data)}`);
   }
 
   return response.data;
@@ -133,7 +137,8 @@ async function uploadVideoFile(uploadUrl: string, videoPath: string): Promise<vo
   await axios.put(uploadUrl, videoBuffer, {
     headers: {
       'Content-Type': 'video/mp4',
-      'Content-Length': videoBuffer.length.toString()
+      'Content-Length': videoBuffer.length.toString(),
+      'Content-Range': `bytes 0-${videoBuffer.length - 1}/${videoBuffer.length}`
     },
     maxContentLength: Infinity,
     maxBodyLength: Infinity
@@ -157,11 +162,11 @@ async function completePublish(
     }
   );
 
-  if (response.data.error) {
+  if (response.data.error && response.data.error.code !== 'ok') {
     throw new Error(`Publish error: ${response.data.error.code} - ${response.data.error.message}`);
   }
 
-  console.log('   Status:', response.data.data.status);
+  console.log('   Status:', response.data.data?.status || 'uploaded_to_inbox');
 }
 
 function handlePublishError(response: any): void {

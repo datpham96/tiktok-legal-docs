@@ -1,0 +1,60 @@
+{
+  "last_updated": "2026-06-30",
+  "notes": "Update file này 1-2 lần/tuần dựa trên TikTok trending page, competitor research, hoặc công cụ analytics",
+  "trending_topics": [
+    {
+      "id": "ai-automation-creators",
+      "topic": "AI automation cho content creator",
+      "angle": "Cách AI giúp creator tiết kiệm thời gian",
+      "hashtags": ["#AIAgent", "#ContentCreation", "#Automation", "#CreatorTips"],
+      "trending_score": 9,
+      "target_audience": "Gen Z creators, freelancers",
+      "notes": "Trend mạnh do nhiều tool AI mới ra mắt"
+    },
+    {
+      "id": "productivity-ai",
+      "topic": "Productivity hacks với AI",
+      "angle": "Làm việc thông minh hơn với AI",
+      "hashtags": ["#ProductivityTips", "#AITools", "#WorkSmart", "#LifeHacks"],
+      "trending_score": 8,
+      "target_audience": "Millennials, workers",
+      "notes": "Luôn hot vì pain point rõ ràng"
+    },
+    {
+      "id": "ai-for-beginners",
+      "topic": "AI cho người mới bắt đầu",
+      "angle": "Bạn cũng dùng được AI, không cần tech",
+      "hashtags": ["#AIForEveryone", "#LearnAI", "#TechTips", "#BeginnerFriendly"],
+      "trending_score": 7,
+      "target_audience": "Người chưa dùng AI, tò mò",
+      "notes": "Niche mass market, dễ viral"
+    },
+    {
+      "id": "future-of-work",
+      "topic": "Tương lai công việc với AI",
+      "angle": "AI sẽ thay đổi cách làm việc thế nào",
+      "hashtags": ["#FutureOfWork", "#AIImpact", "#CareerTips", "#TechTrends"],
+      "trending_score": 7,
+      "target_audience": "Workers lo AI lấy job",
+      "notes": "Gây tranh luận, high engagement"
+    },
+    {
+      "id": "ai-tools-review",
+      "topic": "Review tool AI mới",
+      "angle": "Tool AI này có đáng dùng không?",
+      "hashtags": ["#AITools", "#ToolReview", "#TechReview", "#ProductivityHack"],
+      "trending_score": 8,
+      "target_audience": "Early adopters, tech curious",
+      "notes": "Mọi người luôn tìm tool mới"
+    },
+    {
+      "id": "content-strategy-ai",
+      "topic": "Chiến lược content với AI",
+      "angle": "Làm thế nào để AI không thay thế con người",
+      "hashtags": ["#ContentStrategy", "#AIContent", "#CreatorEconomy", "#Authenticity"],
+      "trending_score": 6,
+      "target_audience": "Content creators lo bị thay thế",
+      "notes": "Góc độ cân bằng, đáng tin"
+    }
+  ]
+}

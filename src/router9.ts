@@ -23,6 +23,15 @@ interface Router9Response {
 
 const FALLBACK_CAPTION = 'Test auto publish video bằng AI Content Agent 🚀 #AI #TikTok #Automation';
 
+function sanitizeCaption(raw: string): string {
+  return raw
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/<thinking>[\s\S]*/gi, '')
+    .replace(/^```[a-zA-Z]*\n?/, '')
+    .replace(/```$/m, '')
+    .trim();
+}
+
 export async function generateCaption(topic: string): Promise<string> {
   try {
     console.log(`🤖 Generating caption for topic: "${topic}"`);
@@ -31,11 +40,11 @@ export async function generateCaption(topic: string): Promise<string> {
     const messages: ChatMessage[] = [
       {
         role: 'system',
-        content: 'You are a creative TikTok content creator. Generate engaging, concise captions with relevant hashtags. Keep it under 150 characters.'
+        content: 'Bạn là chuyên gia viết caption TikTok bằng tiếng Việt. Ngắn gọn, có hook, có hashtag phù hợp creator mới tìm hiểu AI.'
       },
       {
         role: 'user',
-        content: `Create a TikTok caption about: ${topic}`
+        content: `Viết caption TikTok bằng TIẾNG VIỆT cho video về: "${topic}". Tối đa 150 từ, có 3-5 hashtag.`
       }
     ];
 
@@ -45,7 +54,7 @@ export async function generateCaption(topic: string): Promise<string> {
         model: config.router9.model,
         provider: config.router9.provider,
         messages,
-        max_tokens: 100,
+        max_tokens: 300,
         temperature: 0.8,
         stream: false
       },
@@ -58,7 +67,7 @@ export async function generateCaption(topic: string): Promise<string> {
       }
     );
 
-    const caption = response.data.choices[0]?.message?.content?.trim();
+    const caption = sanitizeCaption(response.data.choices[0]?.message?.content || '');
 
     if (!caption) {
       console.warn('⚠️  9router returned empty caption, using fallback');

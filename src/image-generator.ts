@@ -72,13 +72,38 @@ function extractImageB64(data: any): string | null {
   return null;
 }
 
+function saveValidImage(outputPath: string, imageBuffer: Buffer): void {
+  if (imageBuffer.length < 1024) {
+    throw new Error(`Image data suspiciously small (${imageBuffer.length} bytes), likely error response`);
+  }
+
+  const signature = imageBuffer.subarray(0, 12).toString('hex');
+  const isPng = signature.startsWith('89504e470d0a1a0a');
+  const isJpeg = signature.startsWith('ffd8ff');
+  const isWebp = imageBuffer.subarray(0, 4).toString('ascii') === 'RIFF' && imageBuffer.subarray(8, 12).toString('ascii') === 'WEBP';
+
+  if (!isPng && !isJpeg && !isWebp) {
+    throw new Error(`Downloaded data is not a supported image. First bytes: ${signature}`);
+  }
+
+  fs.writeFileSync(outputPath, imageBuffer);
+
+  const stats = fs.statSync(outputPath);
+  if (stats.size < 1024) {
+    fs.unlinkSync(outputPath);
+    throw new Error(`Saved image is invalid (<1KB), deleted: ${outputPath}`);
+  }
+
+  console.log(`✅ Image saved: ${outputPath} (${(stats.size / 1024).toFixed(1)} KB)`);
+}
+
 export async function generateImageWith9Router(
   options: ImageGenerationOptions
 ): Promise<string> {
   const {
     prompt,
     outputPath,
-    model = 'cx/gpt-5.5-image',
+    model = 'nb/nanobanana-flash',
     width = 1024,
     height = 1792
   } = options;
@@ -110,27 +135,38 @@ export async function generateImageWith9Router(
     );
 
     const raw = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-    const events = extractJsonObjectsFromSse(raw);
 
     let imageUrl: string | null = null;
     let imageB64: string | null = null;
 
-    for (const event of events) {
-      imageUrl = extractImageUrl(event) || imageUrl;
-      imageB64 = extractImageB64(event) || imageB64;
+    // 1) Try normal JSON response first (nanobanana returns data[0].url)
+    try {
+      const parsed = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      imageUrl = extractImageUrl(parsed) || imageUrl;
+      imageB64 = extractImageB64(parsed) || imageB64;
+    } catch {
+      // not plain JSON, continue with SSE parsing
     }
 
+    // 2) Fallback to SSE parsing
+    if (!imageUrl && !imageB64) {
+      const events = extractJsonObjectsFromSse(raw);
+      for (const event of events) {
+        imageUrl = extractImageUrl(event) || imageUrl;
+        imageB64 = extractImageB64(event) || imageB64;
+      }
+    }
+
+    // 3) Final fallback: inspect raw response object directly
     if (!imageUrl && !imageB64) {
       imageUrl = extractImageUrl(response.data);
       imageB64 = extractImageB64(response.data);
     }
 
     if (imageB64) {
-      // Decode base64 and save directly
       console.log(`   Decoding base64 image...`);
       const imageBuffer = Buffer.from(imageB64, 'base64');
-      fs.writeFileSync(outputPath, imageBuffer);
-      console.log(`✅ Image saved: ${outputPath}`);
+      saveValidImage(outputPath, imageBuffer);
       return outputPath;
     }
 
@@ -138,16 +174,14 @@ export async function generateImageWith9Router(
       throw new Error('Could not extract image URL or b64_json from response');
     }
 
-    // Download image
     console.log(`   Downloading image...`);
     const imageResponse = await axios.get(imageUrl, {
       responseType: 'arraybuffer',
       timeout: 30000
     });
 
-    // Save to file
-    fs.writeFileSync(outputPath, imageResponse.data);
-    console.log(`✅ Image saved: ${outputPath}`);
+    const imageBuffer = Buffer.from(imageResponse.data);
+    saveValidImage(outputPath, imageBuffer);
 
     return outputPath;
 
@@ -160,26 +194,61 @@ export async function generateImageWith9Router(
   }
 }
 
-export async function generateImagesFromTopic(
-  topic: string,
-  outputDir: string,
-  count: number = 3
+export async function generateImagesFromScenes(
+  scenes: Array<{ image_prompt: string }>,
+  outputDir: string
 ): Promise<string[]> {
-  console.log(`\n🎨 Generating ${count} images for topic: "${topic}"\n`);
+  console.log(`\n🎨 Generating ${scenes.length} scene images from AI script\n`);
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  // Generate prompts for each image
+  const imagePaths: string[] = [];
+  const baseStyle = 'Cinematic TikTok background, vertical composition, vibrant modern colors, high detail, clean aesthetic, no text, no typography, no letters, no words';
+
+  for (let i = 0; i < scenes.length; i++) {
+    const prompt = `${baseStyle}. ${scenes[i].image_prompt}`;
+    const outputPath = path.join(outputDir, `scene_${i + 1}.png`);
+
+    console.log(`\n[${i + 1}/${scenes.length}]`);
+    try {
+      await generateImageWith9Router({ prompt, outputPath });
+      imagePaths.push(outputPath);
+    } catch (error) {
+      console.error(`   Skipping scene ${i + 1} due to error`);
+    }
+
+    if (i < scenes.length - 1) {
+      console.log('   Waiting 2s before next image...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+
+  console.log(`\n✅ Generated ${imagePaths.length}/${scenes.length} images`);
+  return imagePaths;
+}
+
+export async function generateImagesFromTopic(
+  topic: string,
+  outputDir: string,
+  count?: number
+): Promise<string[]> {
   const prompts = generatePromptsFromTopic(topic, count);
+  const plannedCount = prompts.length;
+
+  console.log(`\n🎨 Generating ${plannedCount} images for topic: "${topic}"${count ? ' (manual)' : ' (auto)'}\n`);
+
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
   const imagePaths: string[] = [];
 
   for (let i = 0; i < prompts.length; i++) {
     const prompt = prompts[i];
     const outputPath = path.join(outputDir, `scene_${i + 1}.png`);
 
-    console.log(`\n[${i + 1}/${count}]`);
+    console.log(`\n[${i + 1}/${plannedCount}]`);
     
     try {
       await generateImageWith9Router({ prompt, outputPath });
@@ -195,31 +264,65 @@ export async function generateImagesFromTopic(
     }
   }
 
-  console.log(`\n✅ Generated ${imagePaths.length}/${count} images`);
+  console.log(`\n✅ Generated ${imagePaths.length}/${plannedCount} images`);
   return imagePaths;
 }
 
-function generatePromptsFromTopic(topic: string, count: number): string[] {
-  // Base style prompt for TikTok vertical images
-  const baseStyle = `Modern TikTok style vertical image (9:16 ratio), bold text overlay, trendy gradient background, minimalist design, vibrant colors, professional typography`;
+function estimateSceneCountFromTopic(topic: string): number {
+  const normalized = topic.toLowerCase();
 
-  // Generate scene-specific prompts
-  const prompts: string[] = [];
+  const separators = topic
+    .split(/[,;:+\-–—]|\b(?:và|rồi|sau đó|tiếp theo|đồng thời|vs)\b/gi)
+    .map(part => part.trim())
+    .filter(Boolean);
 
-  if (topic.includes('AI') || topic.includes('lập trình') || topic.includes('programming')) {
-    prompts.push(
-      `${baseStyle}. Title text: "AI TRONG LẬP TRÌNH". Show futuristic coding interface with AI assistant, holographic code displays, neural network visualization`,
-      `${baseStyle}. Title text: "AI AGENT TỰ ĐỘNG HÓA". Show AI robot assistant helping with tasks, automated workflow visualization, modern tech aesthetic`,
-      `${baseStyle}. Title text: "HỌC LẬP TRÌNH VỚI AI". Show person learning with AI tutor hologram, code snippets floating, educational tech vibe`
-    );
-  } else {
-    // Generic scene generation
-    for (let i = 0; i < count; i++) {
-      prompts.push(
-        `${baseStyle}. About: ${topic}. Scene ${i + 1} of ${count}. Creative and engaging visual representation`
-      );
-    }
-  }
+  const stepKeywords = ['bước', 'step', 'quy trình', 'workflow', 'hướng dẫn', 'chi tiết', 'phân tích', 'setup', 'tự động', 'automation'];
+  const shortKeywords = ['mẹo', 'tip', 'nhanh', '3 cách', '5 cách', '7 cách'];
 
-  return prompts.slice(0, count);
+  let score = 0;
+  score += Math.min(separators.length, 6);
+  score += stepKeywords.filter(keyword => normalized.includes(keyword)).length;
+  score -= shortKeywords.filter(keyword => normalized.includes(keyword)).length;
+
+  if (normalized.length > 90) score += 1;
+  if (normalized.length > 140) score += 1;
+
+  const estimated = 4 + Math.max(0, score - 2);
+  return Math.max(3, Math.min(8, estimated));
+}
+
+function generatePromptsFromTopic(topic: string, count?: number): string[] {
+  const plannedCount = count ?? estimateSceneCountFromTopic(topic);
+  const baseStyle = `Cinematic TikTok background image, vertical mobile composition, professional gradient, vibrant modern colors, high detail, clean aesthetic, no text, no typography, no letters, no words`;
+  const normalized = topic.toLowerCase();
+
+  const techTheme = normalized.includes('ai') || normalized.includes('automation') || normalized.includes('creator') || normalized.includes('content') || normalized.includes('tiktok');
+
+  const techScenes = [
+    'powerful hook visual, futuristic AI glow, attention-grabbing composition',
+    'creator pain point visual, content overload, chaotic manual workflow, stressful social media pressure',
+    'AI assistant dashboard, automation pipeline, content planning workflow on screens',
+    'scene showing script generation, idea generation, and trend research happening automatically',
+    'scene showing image generation, video building, and publishing workflow connected together',
+    'successful creator workspace, clean metrics growth, more time freedom, confident atmosphere',
+    'community engagement visual, viral reach, comments, shares, audience growth energy',
+    'strong ending visual, aspirational creator future, modern success vibe, cinematic closure'
+  ];
+
+  const genericScenes = [
+    'bold opening visual, emotional hook, dramatic composition',
+    'clear problem visualization related to the topic',
+    'process visualization showing the first key idea',
+    'process visualization showing the next important idea',
+    'process visualization showing the practical application',
+    'benefit and transformation visualization',
+    'result-focused success visual with momentum',
+    'final inspiring closing visual suitable for call to action'
+  ];
+
+  const sourceScenes = techTheme ? techScenes : genericScenes;
+
+  return sourceScenes.slice(0, plannedCount).map((scene, index) => {
+    return `${baseStyle}. Topic: ${topic}. Scene ${index + 1}/${plannedCount}: ${scene}. Modern trendy aesthetic suitable for TikTok.`;
+  });
 }

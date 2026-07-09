@@ -1,16 +1,10 @@
-<thinking>
-The user is asking me to create a TikTok caption, but there's a problem: they wrote "chủ đề của bạn" which is Vietnamese for "your topic" - they haven't actually specified what topic they want the caption to be about.
+Chỉ cần 10 phút để AI biến mọi ý kiến thành content viral 🔥
 
-This appears to be a template or placeholder text that wasn't filled in. I should point this out and ask them to provide the actual topic they want a caption for.
+Bạn đang hết ý tưởng? Mọi bình luận, thắc mắc của khán giả đều là "vàng" cho sáng tạo nội dung. Video này sẽ hướng dẫn bạn từ A-Z cách dùng AI để:
+- Phân tích & chọn lọc comment tiềm năng
+- Khai thác góc trending AI tạo video ngắn tự động
+- Lên kịch bản nhanh cho TikTok/Reels/Shorts
 
-I should respond in a helpful way that acknowledges the issue and asks for clarification, while staying true to my identity as Kiro - a development-focused AI. The user seems to be treating me as a general-purpose content creation tool, which is outside my primary focus on software development and technical work.
+Không cần tốn hàng giờ brainstorm, AI lo hết. Thử ngay!
 
-However, I can still be helpful. I should:
-1. Point out that "chủ đề của bạn" is a placeholder
-2. Ask what specific topic they want
-3. Optionally note that while I can help with this, my core capabilities are more development-focused
-</thinking>
-
-I see you've included "chủ đề của bạn" (your topic) as a placeholder. What specific topic would you like me to create a TikTok caption about?
-
-While I can help with content creation, my core focus is on software development tasks like writing code, running commands, and technical work. But I'm happy to help with this - just let me know what subject you want the caption to cover.
+#AITrending #AITaoVideo #ContentCreator #SangTaoNoiDung #AIChoNguoiMoi

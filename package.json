@@ -13,10 +13,14 @@
     "demo-simple": "ts-node src/demo-simple.ts",
     "demo-ai-agent": "ts-node src/demo-ai-agent.ts",
     "auto-content": "ts-node src/auto-content.ts",
+    "daily-batch": "ts-node src/daily-batch.ts",
     "test-image": "ts-node src/test-image.ts",
     "test-caption": "ts-node src/test-caption.ts",
     "test-all": "ts-node src/test-all.ts",
     "publish": "ts-node src/index.ts",
+    "check-videos": "ts-node src/check-videos.ts",
+    "trending": "ts-node src/trending-cli.ts",
+    "test-trend-search": "ts-node src/test-trend-search.ts",
     "test-flow": "npm run generate-video && npm run publish"
   },
   "keywords": [

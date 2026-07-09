@@ -50,14 +50,14 @@ async function testImageGeneration() {
 
   console.log('🧪 Testing 9router Image Generation\n');
   console.log('   Endpoint:', `${config.router9.baseUrl}/v1/images/generations`);
-  console.log('   Model: cx/gpt-5.5-image');
+  console.log('   Model: nb/nanobanana-flash');
   console.log('   Prompt: "A cute cat wearing a hat"\n');
 
   try {
     const response = await axios.post(
       `${config.router9.baseUrl}/v1/images/generations`,
       {
-        model: 'cx/gpt-5.5-image',
+        model: 'nb/nanobanana-flash',
         prompt: 'A cute cat wearing a hat',
         n: 1,
         size: 'auto',
@@ -81,14 +81,25 @@ async function testImageGeneration() {
     const raw = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
     console.log(raw.slice(0, 1000));
 
+    let imageUrl: string | null = null;
+
+    // 1) Try normal JSON response first
+    try {
+      const parsed = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      imageUrl = extractImageUrl(parsed) || imageUrl;
+    } catch {
+      // ignore and fallback to SSE parsing
+    }
+
     const events = extractJsonObjectsFromSse(raw);
     console.log(`\n📦 Parsed ${events.length} event(s)`);
 
-    let imageUrl: string | null = null;
+    // 2) Fallback to SSE events
     for (const event of events) {
       imageUrl = extractImageUrl(event) || imageUrl;
     }
 
+    // 3) Final fallback: inspect raw response object directly
     if (!imageUrl) {
       const direct = extractImageUrl(response.data);
       imageUrl = direct || null;

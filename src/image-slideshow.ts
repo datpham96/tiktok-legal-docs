@@ -20,9 +20,10 @@ export async function generateSlideshowFromImages(
 
   // Create FFmpeg concat file
   const concatFile = path.join(tempDir, 'slideshow.txt');
-  const concatContent = imagePaths.map((imgPath, i) => {
-    return `file '${imgPath}'\nduration ${durationPerImage}`;
-  }).join('\n') + `\nfile '${imagePaths[imagePaths.length - 1]}'`;
+  const concatContent = imagePaths.map((imgPath) => {
+    const absolutePath = path.resolve(imgPath);
+    return `file '${absolutePath}'\nduration ${durationPerImage}`;
+  }).join('\n') + `\nfile '${path.resolve(imagePaths[imagePaths.length - 1])}'`;
   
   fs.writeFileSync(concatFile, concatContent);
 
@@ -50,7 +51,7 @@ async function ffmpegSlideshowVideo(concatFile: string, outputPath: string): Pro
       '-f', 'concat',
       '-safe', '0',
       '-i', concatFile,
-      '-vf', 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920',
+      '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
       '-r', '30',
