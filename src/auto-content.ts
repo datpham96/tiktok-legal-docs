@@ -71,9 +71,27 @@ async function renderOverlayImages(scenesPath: string, imagePaths: string[], out
   });
 }
 
+function loadExistingSceneImages(imagesDir: string, count: number): string[] {
+  const available = fs
+    .readdirSync(imagesDir)
+    .filter((name) => /^scene_\d+\.png$/.test(name))
+    .sort((a, b) => parseInt(a.match(/\d+/)![0], 10) - parseInt(b.match(/\d+/)![0], 10));
+
+  if (available.length === 0) {
+    throw new Error(`No existing scene images in ${imagesDir}`);
+  }
+
+  return Array.from({ length: count }, (_, index) => {
+    const fileName = available[index % available.length];
+    return path.join(imagesDir, fileName);
+  });
+}
+
 async function main(): Promise<void> {
-  const topic = process.argv[2] || '3 cách dùng AI trong lập trình';
-  const sceneCountArg = process.argv[3];
+  const args = process.argv.slice(2).filter((arg) => arg !== '--reuse-images');
+  const reuseImages = process.argv.includes('--reuse-images') || process.env.REUSE_IMAGES === '1';
+  const topic = args[0] || '3 cách dùng AI trong lập trình';
+  const sceneCountArg = args[1];
   const sceneCount = sceneCountArg ? parseInt(sceneCountArg, 10) : 5;
 
   console.log('🚀 TikTok Auto Content Generator\n');
@@ -100,7 +118,9 @@ async function main(): Promise<void> {
   });
 
   console.log('\n[STEP 2] Generate scene background images\n');
-  const imagePaths = await generateImagesFromScenes(script.scenes, imagesDir);
+  const imagePaths = reuseImages
+    ? (console.log('   ⚠️ Reusing existing scene images (REUSE_IMAGES)'), loadExistingSceneImages(imagesDir, script.scenes.length))
+    : await generateImagesFromScenes(script.scenes, imagesDir);
 
   if (imagePaths.length === 0) {
     throw new Error('No images generated');

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoPublisher</title>
+  <meta name="description" content="AutoPublisher — create short-form videos and publish through authorized platform APIs.">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icon-32.png">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/studio/demo.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <img src="/assets/icon-192.png" width="36" height="36" alt="AutoPublisher">
+        <span>AutoPublisher</span>
+      </a>
+
+      <nav class="top-links">
+        <a href="/">Website</a>
+        <a href="/privacy-policy">Privacy Policy</a>
+        <a href="/terms-of-service">Terms of Service</a>
+      </nav>
+
+      <div id="account-slot" class="account-slot">
+        <a class="btn btn-connect" href="/auth/tiktok" id="connect-btn">Connect account</a>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="rail">
+        <div class="rail-block">
+          <p class="rail-label">Workspace</p>
+          <button class="rail-item active" type="button">Studio</button>
+          <button class="rail-item" type="button" disabled>Library</button>
+          <button class="rail-item" type="button" disabled>Analytics</button>
+        </div>
+
+        <div class="rail-block">
+          <p class="rail-label">Integrations</p>
+          <div class="integration">
+            <div>
+              <strong>Login Kit</strong>
+              <span>Account connection</span>
+            </div>
+            <span id="login-kit-status" class="pill pill-wait">Idle</span>
+          </div>
+          <div class="integration">
+            <div>
+              <strong>Content Posting API</strong>
+              <span>Profile connection</span>
+            </div>
+            <span id="posting-status" class="pill pill-wait">Idle</span>
+          </div>
+        </div>
+
+        <div class="rail-block">
+          <p class="rail-label">Granted scopes</p>
+          <div id="scope-list" class="scope-list">
+            <span class="scope">user.info.basic</span>
+            <span class="scope">video.upload</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section class="intro">
+          <p class="eyebrow">Creator studio</p>
+          <h1>Publish short-form content with AutoPublisher</h1>
+          <p class="sub">
+            Connect your account, review the generated video and caption, then publish through the official Content Posting API.
+          </p>
+        </section>
+
+        <section class="gate" id="gate-panel">
+          <div class="gate-card">
+            <img src="/assets/icon-192.png" width="56" height="56" alt="">
+            <h2>Connect your account to continue</h2>
+            <p>
+              AutoPublisher uses Login Kit to request basic profile access.
+              After you authorize, your avatar and display name appear here.
+            </p>
+            <a class="btn btn-primary" href="/auth/tiktok">Connect with Login Kit</a>
+          </div>
+        </section>
+
+        <section class="studio hidden" id="studio-panel">
+          <div class="studio-grid">
+            <article class="panel preview-panel">
+              <div class="panel-head">
+                <h2>Video preview</h2>
+                <span id="video-ready" class="pill pill-wait">Checking</span>
+              </div>
+              <div class="phone-frame">
+                <video id="preview-video" src="/media/demo.mp4" controls playsinline loop muted></video>
+              </div>
+              <p class="hint" id="video-hint">Loading demo video…</p>
+            </article>
+
+            <article class="panel compose-panel">
+              <div class="panel-head">
+                <h2>Compose &amp; publish</h2>
+                <span id="compose-status" class="pill pill-wait">Draft</span>
+              </div>
+
+              <label class="field">
+                <span>Caption</span>
+                <textarea id="caption-input" rows="5" maxlength="2200">AutoPublisher production test — created with AI and published via Content Posting API #AutoPublisher #CreatorTools</textarea>
+              </label>
+
+              <label class="field">
+                <span>Privacy</span>
+                <select id="privacy-input">
+                  <option value="SELF_ONLY" selected>Only me</option>
+                  <option value="MUTUAL_FOLLOW_FRIENDS">Friends</option>
+                  <option value="PUBLIC_TO_EVERYONE">Everyone</option>
+                </select>
+              </label>
+
+              <div class="toggle-row">
+                <label><input type="checkbox" id="disable-comment" checked> Disable comments</label>
+                <label><input type="checkbox" id="disable-duet" checked> Disable duet</label>
+                <label><input type="checkbox" id="disable-stitch" checked> Disable stitch</label>
+              </div>
+
+              <div class="actions">
+                <button class="btn btn-primary" type="button" id="publish-btn">Publish video</button>
+                <button class="btn btn-ghost" type="button" id="refresh-btn">Refresh status</button>
+              </div>
+
+              <div class="activity">
+                <p class="activity-title">Activity log</p>
+                <pre id="activity-log">Ready. Connect an account, then publish.</pre>
+              </div>
+            </article>
+          </div>
+
+          <article class="panel result-panel" id="result-panel">
+            <div class="panel-head">
+              <h2>Publish result</h2>
+              <span id="result-pill" class="pill pill-wait">Waiting</span>
+            </div>
+            <p id="result-text">
+              After a successful publish, open the connected account in the mobile app and confirm the new private video appears in the profile or inbox.
+            </p>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <footer class="app-footer">
+      <span>© 2026 AutoPublisher</span>
+      <a href="/">autopublisher.click</a>
+    </footer>
+  </div>
+
+  <script src="/studio/demo.js"></script>
+</body>
+</html>

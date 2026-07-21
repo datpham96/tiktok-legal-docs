@@ -38,7 +38,10 @@ export const config: Config = {
     redirectUri: process.env.TIKTOK_REDIRECT_URI || 'http://localhost:3000/callback/tiktok',
     authUrl: 'https://www.tiktok.com/v2/auth/authorize/',
     tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token/',
-    scopes: ['user.info.basic', 'video.upload']
+    scopes: (process.env.TIKTOK_SCOPES || 'user.info.basic')
+      .split(',')
+      .map((scope) => scope.trim())
+      .filter(Boolean)
   },
   router9: {
     baseUrl: process.env.ROUTER9_BASE_URL || 'https://api.9router.com',

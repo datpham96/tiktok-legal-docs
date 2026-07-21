@@ -32,6 +32,27 @@ function extractJsonObjectsFromSse(raw: string): any[] {
   return jsonObjects;
 }
 
+function extractImageB64FromRaw(raw: string): string | null {
+  let best: string | null = null;
+
+  for (const event of extractJsonObjectsFromSse(raw)) {
+    const b64 = extractImageB64(event);
+    if (b64 && (!best || b64.length > best.length)) {
+      best = b64;
+    }
+  }
+
+  const matches = [...raw.matchAll(/"b64_json"\s*:\s*"([A-Za-z0-9+/=\r\n]+)"/g)];
+  for (const match of matches) {
+    const cleaned = match[1].replace(/\s/g, '');
+    if (cleaned.length > (best?.length || 0)) {
+      best = cleaned;
+    }
+  }
+
+  return best;
+}
+
 function extractImageUrl(data: any): string | null {
   if (!data) return null;
 
@@ -103,7 +124,7 @@ export async function generateImageWith9Router(
   const {
     prompt,
     outputPath,
-    model = 'nb/nanobanana-flash',
+    model = 'cx/gpt-5.5-image',
     width = 1024,
     height = 1792
   } = options;
@@ -130,28 +151,29 @@ export async function generateImageWith9Router(
           'Accept': 'text/event-stream'
         },
         responseType: 'text',
-        timeout: 120000
+        timeout: 180000
       }
     );
 
     const raw = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
 
     let imageUrl: string | null = null;
-    let imageB64: string | null = null;
+    let imageB64: string | null = extractImageB64FromRaw(raw);
 
-    // 1) Try normal JSON response first (nanobanana returns data[0].url)
-    try {
-      const parsed = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      imageUrl = extractImageUrl(parsed) || imageUrl;
-      imageB64 = extractImageB64(parsed) || imageB64;
-    } catch {
-      // not plain JSON, continue with SSE parsing
+    // 1) Try normal JSON response first
+    if (!imageB64) {
+      try {
+        const parsed = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+        imageUrl = extractImageUrl(parsed) || imageUrl;
+        imageB64 = extractImageB64(parsed) || imageB64;
+      } catch {
+        // not plain JSON, continue with SSE parsing
+      }
     }
 
-    // 2) Fallback to SSE parsing
+    // 2) Fallback to SSE event objects
     if (!imageUrl && !imageB64) {
-      const events = extractJsonObjectsFromSse(raw);
-      for (const event of events) {
+      for (const event of extractJsonObjectsFromSse(raw)) {
         imageUrl = extractImageUrl(event) || imageUrl;
         imageB64 = extractImageB64(event) || imageB64;
       }

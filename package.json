@@ -14,6 +14,7 @@
     "demo-ai-agent": "ts-node src/demo-ai-agent.ts",
     "auto-content": "ts-node src/auto-content.ts",
     "daily-batch": "ts-node src/daily-batch.ts",
+    "bulk-batch": "ts-node src/bulk-batch.ts",
     "test-image": "ts-node src/test-image.ts",
     "test-caption": "ts-node src/test-caption.ts",
     "test-all": "ts-node src/test-all.ts",

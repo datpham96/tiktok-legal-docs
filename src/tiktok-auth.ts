@@ -16,7 +16,6 @@ interface TokenData {
 
 interface PkceState {
   state: string;
-  codeVerifier: string;
   createdAt: number;
 }
 
@@ -24,12 +23,9 @@ const pkceStateFile = path.join(process.cwd(), 'pkce-state.json');
 
 export function getAuthUrl(): string {
   const state = randomBase64Url(32);
-  const codeVerifier = randomBase64Url(64);
-  const codeChallenge = createCodeChallenge(codeVerifier);
 
   savePkceState({
     state,
-    codeVerifier,
     createdAt: Date.now()
   });
 
@@ -38,12 +34,10 @@ export function getAuthUrl(): string {
     scope: config.tiktok.scopes.join(','),
     response_type: 'code',
     redirect_uri: config.tiktok.redirectUri,
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256'
+    state
   });
 
-  console.log('🔐 Generated TikTok PKCE challenge');
+  console.log('🔐 Generated TikTok OAuth state');
   return `${config.tiktok.authUrl}?${params.toString()}`;
 }
 
@@ -57,8 +51,7 @@ export async function exchangeCodeForToken(code: string, state?: string): Promis
       client_secret: config.tiktok.clientSecret,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: config.tiktok.redirectUri,
-      code_verifier: pkceState.codeVerifier
+      redirect_uri: config.tiktok.redirectUri
     });
 
     const response = await axios.post(

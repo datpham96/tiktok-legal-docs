@@ -39,6 +39,10 @@ async function pickTopic(manualTopic?: string): Promise<string> {
   const series = loadSeries();
   const baseTopic = nextSeriesTopic(series);
 
+  if (process.env.SERIES_ONLY === '1') {
+    return baseTopic;
+  }
+
   try {
     const trends = await searchTrendingTopics();
     const trendHint = trends.trending_topics[0];
@@ -86,7 +90,12 @@ function resolveNpx(): string {
 
 function runAutoContent(topic: string): void {
   const npx = resolveNpx();
-  const result = spawnSync(npx, ['ts-node', path.join('src', 'auto-content.ts'), topic], {
+  const args = ['ts-node', path.join('src', 'auto-content.ts'), topic];
+  if (process.env.REUSE_IMAGES === '1') {
+    args.push('--reuse-images');
+  }
+
+  const result = spawnSync(npx, args, {
     cwd: process.cwd(),
     stdio: 'inherit',
     env: process.env,
@@ -125,7 +134,7 @@ function runCover(scenesPath: string): void {
 
 function archiveOutputs(topic: string): string {
   const now = new Date();
-  const stamp = now.toISOString().slice(0, 16).replace('T', '-').replace(':', '');
+  const stamp = now.toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '');
   const folderName = `${stamp}-${slotLabel()}`;
   const outDir = path.join(POSTS_DIR, folderName);
   fs.mkdirSync(outDir, { recursive: true });

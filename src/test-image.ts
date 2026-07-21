@@ -23,6 +23,27 @@ function extractJsonObjectsFromSse(raw: string): any[] {
   return jsonObjects;
 }
 
+function extractImageB64FromRaw(raw: string): string | null {
+  let best: string | null = null;
+
+  for (const event of extractJsonObjectsFromSse(raw)) {
+    const b64 = extractImageB64(event);
+    if (b64 && (!best || b64.length > best.length)) {
+      best = b64;
+    }
+  }
+
+  const matches = [...raw.matchAll(/"b64_json"\s*:\s*"([A-Za-z0-9+/=\r\n]+)"/g)];
+  for (const match of matches) {
+    const cleaned = match[1].replace(/\s/g, '');
+    if (cleaned.length > (best?.length || 0)) {
+      best = cleaned;
+    }
+  }
+
+  return best;
+}
+
 function extractImageUrl(data: any): string | null {
   if (!data) return null;
 
@@ -45,19 +66,37 @@ function extractImageUrl(data: any): string | null {
   return null;
 }
 
+function extractImageB64(data: any): string | null {
+  if (!data) return null;
+
+  if (data.b64_json && typeof data.b64_json === 'string') {
+    return data.b64_json;
+  }
+
+  if (Array.isArray(data.data) && data.data[0]?.b64_json) {
+    return data.data[0].b64_json;
+  }
+
+  if (data.result?.b64_json) {
+    return data.result.b64_json;
+  }
+
+  return null;
+}
+
 async function testImageGeneration() {
   validateEnv(['ROUTER9_API_KEY']);
 
   console.log('🧪 Testing 9router Image Generation\n');
   console.log('   Endpoint:', `${config.router9.baseUrl}/v1/images/generations`);
-  console.log('   Model: nb/nanobanana-flash');
+  console.log('   Model: cx/gpt-5.5-image');
   console.log('   Prompt: "A cute cat wearing a hat"\n');
 
   try {
     const response = await axios.post(
       `${config.router9.baseUrl}/v1/images/generations`,
       {
-        model: 'nb/nanobanana-flash',
+        model: 'cx/gpt-5.5-image',
         prompt: 'A cute cat wearing a hat',
         n: 1,
         size: 'auto',
@@ -73,7 +112,7 @@ async function testImageGeneration() {
           'Accept': 'text/event-stream'
         },
         responseType: 'text',
-        timeout: 120000
+        timeout: 180000
       }
     );
 
@@ -82,31 +121,37 @@ async function testImageGeneration() {
     console.log(raw.slice(0, 1000));
 
     let imageUrl: string | null = null;
+    let imageB64: string | null = extractImageB64FromRaw(raw);
 
-    // 1) Try normal JSON response first
-    try {
-      const parsed = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      imageUrl = extractImageUrl(parsed) || imageUrl;
-    } catch {
-      // ignore and fallback to SSE parsing
+    if (!imageB64) {
+      try {
+        const parsed = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+        imageUrl = extractImageUrl(parsed) || imageUrl;
+        imageB64 = extractImageB64(parsed) || imageB64;
+      } catch {
+        // ignore
+      }
     }
 
     const events = extractJsonObjectsFromSse(raw);
     console.log(`\n📦 Parsed ${events.length} event(s)`);
 
-    // 2) Fallback to SSE events
-    for (const event of events) {
-      imageUrl = extractImageUrl(event) || imageUrl;
+    if (!imageUrl && !imageB64) {
+      for (const event of events) {
+        imageUrl = extractImageUrl(event) || imageUrl;
+        imageB64 = extractImageB64(event) || imageB64;
+      }
     }
 
-    // 3) Final fallback: inspect raw response object directly
-    if (!imageUrl) {
-      const direct = extractImageUrl(response.data);
-      imageUrl = direct || null;
+    if (imageB64) {
+      const outputPath = 'test-image.png';
+      fs.writeFileSync(outputPath, Buffer.from(imageB64, 'base64'));
+      console.log('✅ Image saved from b64:', outputPath);
+      return;
     }
 
     if (!imageUrl) {
-      console.error('\n❌ Could not extract image URL from response');
+      console.error('\n❌ Could not extract image from response');
       process.exit(1);
     }
 
