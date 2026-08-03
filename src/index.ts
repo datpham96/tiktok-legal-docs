@@ -28,7 +28,9 @@ async function main(): Promise<void> {
     privacy: 'SELF_ONLY',
     disableComment: false,
     disableDuet: true,
-    disableStitch: true
+    disableStitch: true,
+    autoAddMusic: true,
+    isAigc: true
   });
 }
 

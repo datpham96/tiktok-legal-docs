@@ -146,6 +146,15 @@ export function loadTokens(): TokenData | null {
   }
 }
 
+export function clearTokens(): void {
+  if (fs.existsSync(config.storage.tokensFile)) {
+    fs.unlinkSync(config.storage.tokensFile);
+  }
+
+  clearPkceState();
+  console.log('✅ TikTok tokens cleared');
+}
+
 export async function refreshAccessToken(refreshToken: string): Promise<TokenData> {
   console.log('🔄 Refreshing access token...');
 
@@ -167,6 +176,12 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenDat
       }
     );
 
+    if (response.data.error || !response.data.access_token) {
+      throw new Error(
+        `TikTok refresh error: ${response.data.error || 'missing_access_token'} - ${response.data.error_description || 'no token returned'}`
+      );
+    }
+
     const tokenData: TokenData = {
       ...response.data,
       created_at: Date.now()
@@ -174,11 +189,16 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenDat
 
     saveTokens(tokenData);
     console.log('✅ Access token refreshed successfully');
+    console.log(`   Scope: ${tokenData.scope}`);
 
     return tokenData;
 
   } catch (error: any) {
     console.error('❌ Token refresh failed:', error.message);
+    if (error.response) {
+      console.error('   Status:', error.response.status);
+      console.error('   Response:', JSON.stringify(error.response.data, null, 2));
+    }
     throw error;
   }
 }

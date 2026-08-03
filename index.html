@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPublisher</title>
+  <title>AutoPublisher — AI short-form video studio for creators</title>
   <meta name="description" content="AutoPublisher helps creators research topics, generate short-form videos with AI, and publish to social platforms through official APIs.">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icon-32.png">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/site.css?v=20260727b">
 </head>
 <body>
   <header class="site-header">
@@ -17,72 +20,100 @@
     </a>
     <nav class="site-nav">
       <a href="#features">Features</a>
-      <a href="#how-it-works">How It Works</a>
+      <a href="#how-it-works">How it works</a>
       <a href="#about">About</a>
-      <a href="/terms-of-service">Terms of Service</a>
-      <a href="/privacy-policy">Privacy Policy</a>
-      <a href="mailto:contact@autopublisher.click">Contact</a>
+      <a href="/terms-of-service">Terms</a>
+      <a href="/privacy-policy">Privacy</a>
+      <a class="nav-cta" href="/studio">Open Studio</a>
     </nav>
   </header>
 
   <main class="page-main">
     <section class="hero">
-      <h1>AutoPublisher</h1>
+      <span class="hero-badge"><span class="dot"></span> Official TikTok Content Posting API</span>
+      <h1>Create short-form video<br><span class="grad">and publish it in minutes</span></h1>
       <p class="lead">
-        AutoPublisher is a creator workflow platform that researches trending topics,
-        generates vertical short-form videos with AI-written captions, and publishes
-        content through official platform APIs after user authorization.
+        AutoPublisher researches trending topics, generates vertical videos with AI-written
+        captions, and publishes them to your connected account through official platform APIs —
+        always with your explicit consent.
       </p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="/studio">Open Studio</a>
-        <a class="btn btn-secondary" href="/privacy-policy">Privacy Policy</a>
+        <a class="btn btn-secondary" href="#how-it-works">See how it works</a>
       </div>
+      <p class="hero-note">No auto-posting. You review every video and press publish yourself.</p>
     </section>
 
-    <h2 class="section-title" id="features">Product Features</h2>
+    <h2 class="section-title" id="features">Everything in one workflow</h2>
+    <p class="section-sub">From topic research to an authorized post on your profile.</p>
     <section class="grid-2">
       <article class="card">
-        <h3>Trend Research</h3>
+        <div class="card-icon">🔍</div>
+        <h3>Trend research</h3>
         <p>Discover relevant topics in technology, AI, and creator-economy niches to plan content that matches audience demand.</p>
       </article>
       <article class="card">
-        <h3>AI Video Creation</h3>
+        <div class="card-icon">🎬</div>
+        <h3>AI video creation</h3>
         <p>Build multi-scene vertical videos with generated visuals, on-screen text overlays, and pacing optimized for short-form platforms.</p>
       </article>
       <article class="card">
-        <h3>Caption &amp; Hashtag Generation</h3>
+        <div class="card-icon">✍️</div>
+        <h3>Caption &amp; hashtags</h3>
         <p>Produce engaging captions and hashtag sets for each topic using AI language models tuned for creator workflows.</p>
       </article>
       <article class="card">
-        <h3>Authorized Publishing</h3>
-        <p>Connect a user account through OAuth, then publish approved content only after explicit user consent and scope authorization.</p>
+        <div class="card-icon">🔐</div>
+        <h3>Authorized publishing</h3>
+        <p>Connect your account through OAuth, then publish approved content only after explicit consent and scope authorization.</p>
       </article>
     </section>
 
-    <h2 class="section-title" id="how-it-works">How It Works</h2>
+    <h2 class="section-title" id="how-it-works">How it works</h2>
+    <p class="section-sub">Four steps, and you stay in control at every one of them.</p>
     <ol class="steps">
-      <li>Sign in and connect your social account through the platform's official Login Kit (OAuth 2.0).</li>
+      <li>Connect your social account through the platform's official Login Kit (OAuth 2.0).</li>
       <li>AutoPublisher researches a topic and plans a multi-scene storyboard for your video.</li>
       <li>AI generates scene visuals, captions, and hashtags based on your selected topic.</li>
-      <li>Review the output, then publish through the authorized API integration.</li>
+      <li>Review everything in Studio, choose your privacy settings, then publish.</li>
     </ol>
 
     <section class="about-box" id="about">
       <h2>About AutoPublisher</h2>
       <p>
-        AutoPublisher is operated as a web-based creator tool focused on helping individuals
-        and small teams produce short-form content faster while keeping publishing actions
-        under user control.
+        AutoPublisher is a web-based creator tool focused on helping individuals and small teams
+        produce short-form content faster while keeping every publishing action under user control.
       </p>
       <p>
-        Our service integrates with third-party developer APIs only after users grant
-        permission. We do not sell personal data and we provide clear legal documentation
-        for terms of use and privacy practices.
+        Our service integrates with third-party developer APIs only after users grant permission.
+        We do not sell personal data and we provide clear legal documentation for terms of use
+        and privacy practices.
       </p>
       <p>
         For support, partnerships, or data requests, email
         <a href="mailto:contact@autopublisher.click">contact@autopublisher.click</a>.
       </p>
+
+      <div class="compliance">
+        <div>
+          <strong>You approve every post</strong>
+          <span>Content is only sent after you press publish.</span>
+        </div>
+        <div>
+          <strong>You choose the audience</strong>
+          <span>Privacy level is selected by you before each post.</span>
+        </div>
+        <div>
+          <strong>Disconnect anytime</strong>
+          <span>Revoke access from Studio in one click.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-band">
+      <h2>Ready to publish your next video?</h2>
+      <p>Connect your account and post your first AI-generated short in minutes.</p>
+      <a class="btn btn-primary" href="/studio">Open Studio</a>
     </section>
   </main>
 

@@ -19,6 +19,8 @@
     "test-caption": "ts-node src/test-caption.ts",
     "test-all": "ts-node src/test-all.ts",
     "publish": "ts-node src/index.ts",
+    "publish-post": "ts-node src/publish-post.ts",
+    "publish-photo-post": "ts-node src/publish-photo-post.ts",
     "check-videos": "ts-node src/check-videos.ts",
     "trending": "ts-node src/trending-cli.ts",
     "test-trend-search": "ts-node src/test-trend-search.ts",

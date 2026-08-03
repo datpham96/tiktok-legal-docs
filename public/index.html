@@ -9,8 +9,8 @@
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/studio/demo.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/studio/demo.css?v=20260727e">
 </head>
 <body>
   <div class="app-shell">
@@ -89,6 +89,27 @@
         </section>
 
         <section class="studio hidden" id="studio-panel">
+          <!-- Creator info — required by TikTok UX guidelines: fetched fresh each
+               time this page renders so the user knows which account receives the post. -->
+          <article class="panel creator-panel">
+            <div id="creator-loading" class="creator-loading">Loading your TikTok account…</div>
+
+            <div id="creator-card" class="creator-card hidden">
+              <img id="creator-avatar" src="/assets/icon-192.png" alt="TikTok avatar">
+              <div class="creator-names">
+                <strong id="creator-nickname">—</strong>
+                <span id="creator-username" class="creator-username">—</span>
+              </div>
+              <span class="pill pill-ok">Connected</span>
+              <span class="creator-posting-note">This video will be posted to the TikTok account above.</span>
+            </div>
+
+            <div id="creator-error" class="creator-error hidden">
+              <p>We couldn't load your TikTok account details. Publishing is paused until we can confirm your account — please try again later.</p>
+              <button class="btn btn-ghost" type="button" id="creator-retry-btn">Try again</button>
+            </div>
+          </article>
+
           <div class="studio-grid">
             <article class="panel preview-panel">
               <div class="panel-head">
@@ -98,42 +119,111 @@
               <div class="phone-frame">
                 <video id="preview-video" src="/media/demo.mp4" controls playsinline loop muted></video>
               </div>
-              <p class="hint" id="video-hint">Loading demo video…</p>
+              <dl class="video-meta" id="video-meta">
+                <div><dt>File</dt><dd id="video-filename">—</dd></div>
+                <div><dt>Duration</dt><dd id="video-duration">—</dd></div>
+                <div><dt>Size</dt><dd id="video-size">—</dd></div>
+              </dl>
+              <p class="hint hidden" id="video-duration-warning"></p>
+              <div class="actions actions-center">
+                <button class="btn btn-ghost" type="button" id="replace-video-btn">Replace video</button>
+                <input type="file" id="video-file-input" accept="video/mp4,video/quicktime" hidden>
+              </div>
+              <p class="hint" id="video-hint">Loading video…</p>
             </article>
 
             <article class="panel compose-panel">
               <div class="panel-head">
-                <h2>Compose &amp; publish</h2>
+                <h2>Post to TikTok</h2>
                 <span id="compose-status" class="pill pill-wait">Draft</span>
               </div>
 
               <label class="field">
                 <span>Caption</span>
-                <textarea id="caption-input" rows="5" maxlength="2200">AutoPublisher production test — created with AI and published via Content Posting API #AutoPublisher #CreatorTools</textarea>
+                <textarea id="caption-input" rows="4" maxlength="2200" placeholder="Write a caption for your video…">AutoPublisher test — created with AI #AutoPublisher #CreatorTools</textarea>
+                <span class="char-counter"><span id="caption-count">0</span> / 2200 characters</span>
               </label>
 
               <label class="field">
-                <span>Privacy</span>
-                <select id="privacy-input">
-                  <option value="SELF_ONLY" selected>Only me</option>
-                  <option value="MUTUAL_FOLLOW_FRIENDS">Friends</option>
-                  <option value="PUBLIC_TO_EVERYONE">Everyone</option>
+                <span>Who can view this video</span>
+                <select id="privacy-input" required>
+                  <option value="" selected disabled>Select who can view this video</option>
                 </select>
+                <span class="hint-inline hidden" id="privacy-note"></span>
               </label>
 
-              <div class="toggle-row">
-                <label><input type="checkbox" id="disable-comment" checked> Disable comments</label>
-                <label><input type="checkbox" id="disable-duet" checked> Disable duet</label>
-                <label><input type="checkbox" id="disable-stitch" checked> Disable stitch</label>
-              </div>
+              <fieldset class="field interaction-field">
+                <span class="field-label">Allow users to</span>
+                <div class="toggle-row">
+                  <label id="allow-comment-label"><input type="checkbox" id="allow-comment"> Comment</label>
+                  <label id="allow-duet-label"><input type="checkbox" id="allow-duet"> Duet</label>
+                  <label id="allow-stitch-label"><input type="checkbox" id="allow-stitch"> Stitch</label>
+                </div>
+                <p class="hint-inline hidden" id="interaction-note"></p>
+              </fieldset>
+
+              <!-- Commercial content disclosure — required by TikTok UX guidelines -->
+              <fieldset class="field commercial-field">
+                <label class="commercial-toggle">
+                  <input type="checkbox" id="commercial-toggle">
+                  <span>
+                    <strong>Disclose video content</strong>
+                    <small>Turn on if this video promotes goods or services in exchange for something of value.</small>
+                  </span>
+                </label>
+
+                <div id="commercial-options" class="commercial-options hidden">
+                  <label class="commercial-option">
+                    <input type="checkbox" id="your-brand">
+                    <span>
+                      <strong>Your brand</strong>
+                      <small>You are promoting yourself or your own business.</small>
+                    </span>
+                  </label>
+                  <label class="commercial-option" id="branded-content-option">
+                    <input type="checkbox" id="branded-content">
+                    <span>
+                      <strong>Branded content</strong>
+                      <small>You are promoting another brand or a third party.</small>
+                    </span>
+                  </label>
+                  <p class="hint-inline hidden" id="commercial-label-note"></p>
+                  <p class="hint-inline hint-warn hidden" id="commercial-warning"></p>
+                </div>
+              </fieldset>
+
+              <!-- AI-generated content disclosure -->
+              <fieldset class="field commercial-field">
+                <label class="commercial-toggle">
+                  <input type="checkbox" id="aigc-toggle">
+                  <span>
+                    <strong>AI-generated content</strong>
+                    <small>Turn on if this video was fully or partly created with AI. TikTok will label it as AI-generated.</small>
+                  </span>
+                </label>
+              </fieldset>
+
+              <!-- Music usage / branded content declaration — required wording -->
+              <p class="declaration" id="declaration">
+                By posting, you agree to TikTok's
+                <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a>.
+              </p>
 
               <div class="actions">
-                <button class="btn btn-primary" type="button" id="publish-btn">Publish video</button>
-                <button class="btn btn-ghost" type="button" id="refresh-btn">Refresh status</button>
+                <button class="btn btn-primary" type="button" id="publish-btn" disabled>Publish to TikTok</button>
+                <button class="btn btn-ghost" type="button" id="refresh-btn">Refresh</button>
               </div>
+              <p class="hint-inline" id="publish-hint">Select who can view this video to continue.</p>
+
+              <ol class="progress-steps hidden" id="progress-steps">
+                <li id="step-uploading"><span class="step-dot"></span> Uploading…</li>
+                <li id="step-publishing"><span class="step-dot"></span> Publishing…</li>
+                <li id="step-processing"><span class="step-dot"></span> Processing…</li>
+                <li id="step-done"><span class="step-dot"></span> Done</li>
+              </ol>
 
               <div class="activity">
-                <p class="activity-title">Activity log</p>
+                <p class="activity-title">Activity</p>
                 <pre id="activity-log">Ready. Connect an account, then publish.</pre>
               </div>
             </article>
@@ -145,8 +235,30 @@
               <span id="result-pill" class="pill pill-wait">Waiting</span>
             </div>
             <p id="result-text">
-              After a successful publish, open the connected account in the mobile app and confirm the new private video appears in the profile or inbox.
+              Your publish result will appear here after you post.
             </p>
+          </article>
+
+          <article class="panel success-panel hidden" id="success-panel">
+            <h2 id="success-title">✔ Published</h2>
+            <dl class="success-details">
+              <div><dt>Publish ID</dt><dd id="success-publish-id">—</dd></div>
+              <div><dt>Publish time</dt><dd id="success-time">—</dd></div>
+              <div><dt>Privacy</dt><dd id="success-privacy">—</dd></div>
+              <div><dt>Caption</dt><dd id="success-caption">—</dd></div>
+            </dl>
+            <p class="success-note">It may take a few moments before the video appears on your TikTok profile.</p>
+            <p class="success-note hidden" id="success-inbox-note">
+              Your video was sent to your TikTok inbox. Open the TikTok mobile app to review and complete the post.
+            </p>
+          </article>
+
+          <article class="panel error-panel hidden" id="error-panel">
+            <h2>Something went wrong</h2>
+            <p id="error-message">We couldn't publish your video.</p>
+            <div class="actions">
+              <button class="btn btn-primary" type="button" id="error-retry-btn">Try again</button>
+            </div>
           </article>
         </section>
       </main>
@@ -158,6 +270,6 @@
     </footer>
   </div>
 
-  <script src="/studio/demo.js"></script>
+  <script src="/studio/demo.js?v=20260727e"></script>
 </body>
 </html>

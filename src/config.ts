@@ -13,6 +13,8 @@ interface Config {
     authUrl: string;
     tokenUrl: string;
     scopes: string[];
+    /** TikTok only allows SELF_ONLY posts until the app passes review. */
+    audited: boolean;
   };
   router9: {
     baseUrl: string;
@@ -41,7 +43,8 @@ export const config: Config = {
     scopes: (process.env.TIKTOK_SCOPES || 'user.info.basic')
       .split(',')
       .map((scope) => scope.trim())
-      .filter(Boolean)
+      .filter(Boolean),
+    audited: process.env.TIKTOK_APP_AUDITED === 'true'
   },
   router9: {
     baseUrl: process.env.ROUTER9_BASE_URL || 'https://api.9router.com',
