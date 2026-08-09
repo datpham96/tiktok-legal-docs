@@ -2,7 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { config } from './config';
-import { loadTokens } from './tiktok-auth';
+import { getValidTokens } from './tiktok-auth';
 import {
   publishVideo,
   queryCreatorInfo,
@@ -184,7 +184,7 @@ export function saveDemoVideo(buffer: Buffer): void {
 
 // Required by TikTok UX guidelines: fetched fresh every time the publish page renders.
 export async function getDemoCreatorInfo(): Promise<CreatorInfo> {
-  const tokenData = loadTokens();
+  const tokenData = await getValidTokens();
   if (!tokenData) {
     throw new Error('Connect a TikTok account first.');
   }
@@ -192,7 +192,7 @@ export async function getDemoCreatorInfo(): Promise<CreatorInfo> {
 }
 
 export async function getDemoStatus(): Promise<DemoStatus> {
-  const tokenData = loadTokens();
+  const tokenData = await getValidTokens();
   const videoPath = getDemoVideoPath();
   const videoReady = fs.existsSync(videoPath) && fs.statSync(videoPath).size > 1024;
   const videoSizeBytes = videoReady ? fs.statSync(videoPath).size : null;
@@ -222,7 +222,7 @@ export async function getDemoStatus(): Promise<DemoStatus> {
     : config.tiktok.scopes;
 
   return {
-    connected: expiresIn > 0,
+    connected: true,
     scopes,
     expiresIn,
     videoReady,
@@ -278,7 +278,7 @@ function validatePublishInput(input: DemoPublishInput): {
 }
 
 export async function publishDemoVideo(input: DemoPublishInput = {}): Promise<DemoPublishResult> {
-  const tokenData = loadTokens();
+  const tokenData = await getValidTokens();
   if (!tokenData) {
     throw new Error('Connect a TikTok account first.');
   }
@@ -312,7 +312,7 @@ export async function publishDemoVideo(input: DemoPublishInput = {}): Promise<De
       brandContentToggle,
       brandOrganicToggle,
       isAigc: Boolean(input.isAigc),
-      autoAddMusic: true,
+      muxBgm: true,
       onProgress: (stage, detail) => {
         publishProgress.stage = stage;
         if (detail) publishProgress.publishId = detail;

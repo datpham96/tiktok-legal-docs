@@ -116,32 +116,73 @@ export function saveTokens(tokenData: TokenData): void {
   }
 }
 
-export function loadTokens(): TokenData | null {
+/** Read tokens.json without expiry check. */
+function readTokenFile(): TokenData | null {
   try {
     if (!fs.existsSync(config.storage.tokensFile)) {
+      return null;
+    }
+    return JSON.parse(fs.readFileSync(config.storage.tokensFile, 'utf-8')) as TokenData;
+  } catch {
+    return null;
+  }
+}
+
+const REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh ~5 min before access token expires
+
+export function loadTokens(): TokenData | null {
+  try {
+    const tokenData = readTokenFile();
+    if (!tokenData) {
       console.warn('⚠️  No tokens file found');
       return null;
     }
 
-    const data = fs.readFileSync(config.storage.tokensFile, 'utf-8');
-    const tokenData: TokenData = JSON.parse(data);
+    const expiresAt = tokenData.created_at + tokenData.expires_in * 1000;
 
-    const now = Date.now();
-    const expiresAt = tokenData.created_at + (tokenData.expires_in * 1000);
-
-    if (now >= expiresAt) {
-      console.warn('⚠️  Access token has expired');
-      console.log('💡 Run OAuth flow again: npm run dev, then visit http://localhost:3000/auth/tiktok');
+    if (Date.now() >= expiresAt) {
+      console.warn('⚠️  Access token has expired (use getValidTokens() to auto-refresh)');
       return null;
     }
 
-    const remainingSeconds = Math.floor((expiresAt - now) / 1000);
+    const remainingSeconds = Math.floor((expiresAt - Date.now()) / 1000);
     console.log(`✅ Loaded valid access token (expires in ${remainingSeconds}s)`);
 
     return tokenData;
-
   } catch (error: any) {
     console.error('❌ Failed to load tokens:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Return a valid access token, refreshing automatically when expired or near expiry.
+ * Only falls back to manual OAuth when refresh_token is missing or refresh fails.
+ */
+export async function getValidTokens(): Promise<TokenData | null> {
+  const tokenData = readTokenFile();
+  if (!tokenData) {
+    console.warn('⚠️  No tokens file found');
+    return null;
+  }
+
+  const expiresAt = tokenData.created_at + tokenData.expires_in * 1000;
+  if (Date.now() < expiresAt - REFRESH_BUFFER_MS) {
+    const remainingSeconds = Math.floor((expiresAt - Date.now()) / 1000);
+    console.log(`✅ Loaded valid access token (expires in ${remainingSeconds}s)`);
+    return tokenData;
+  }
+
+  if (!tokenData.refresh_token) {
+    console.warn('⚠️  Access token expired and no refresh_token — reconnect at /auth/tiktok');
+    return null;
+  }
+
+  console.log('🔄 Access token expired or near expiry — refreshing...');
+  try {
+    return await refreshAccessToken(tokenData.refresh_token);
+  } catch {
+    console.warn('⚠️  Token refresh failed — reconnect at /auth/tiktok');
     return null;
   }
 }

@@ -1,6 +1,7 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { photosFromOverlays, syncPhotosToPublic } from './photo-assets';
 import { searchTrendingTopics } from './trend-searcher';
 
 const SERIES_FILE = path.join(process.cwd(), 'content-series.json');
@@ -152,17 +153,39 @@ function archiveOutputs(topic: string): string {
     }
   }
 
+  // Photo-first assets for TikTok PHOTO Direct Post (+ auto music)
+  const photosSrc = path.join(VIDEOS_DIR, 'photos');
+  const photosDest = path.join(outDir, 'photos');
+  let photoCount = 0;
+  if (fs.existsSync(photosSrc)) {
+    fs.mkdirSync(photosDest, { recursive: true });
+    for (const name of fs.readdirSync(photosSrc)) {
+      if (!/\.jpe?g$/i.test(name)) continue;
+      fs.copyFileSync(path.join(photosSrc, name), path.join(photosDest, name));
+      photoCount += 1;
+    }
+  }
+
+  // Also mirror into public/media/posts for PULL_FROM_URL
+  if (photoCount > 0) {
+    syncPhotosToPublic(folderName, outDir);
+  }
+
   const meta = {
     topic,
     created_at: now.toISOString(),
     slot: slotLabel(),
-    video: 'video.mp4',
+    format: photoCount > 0 ? 'photo' : 'video',
+    video: fs.existsSync(path.join(outDir, 'video.mp4')) ? 'video.mp4' : null,
+    photos: photoCount > 0 ? 'photos/' : null,
+    photo_count: photoCount,
     caption: 'caption.txt',
     cover: fs.existsSync(path.join(outDir, 'cover.png')) ? 'cover.png' : null,
   };
 
   fs.writeFileSync(path.join(outDir, 'meta.json'), `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
   fs.writeFileSync(path.join(VIDEOS_DIR, 'latest-topic.txt'), `${topic}\n`, 'utf8');
+  fs.writeFileSync(path.join(VIDEOS_DIR, 'latest-post.txt'), `${folderName}\n`, 'utf8');
 
   return outDir;
 }
@@ -182,12 +205,31 @@ async function main(): Promise<void> {
   const scenesPath = path.join(VIDEOS_DIR, 'scenes.json');
   runCover(scenesPath);
 
+  // Rebuild photo set from overlays (4/6/8 scenes — first scene is cover)
+  const overlaysDir = path.join(process.cwd(), 'images', 'overlays');
+  const photosDir = path.join(VIDEOS_DIR, 'photos');
+  if (fs.existsSync(overlaysDir)) {
+    const overlayPaths = fs
+      .readdirSync(overlaysDir)
+      .filter((name) => /^scene_\d+\.png$/.test(name))
+      .sort((a, b) => parseInt(a.match(/\d+/)![0], 10) - parseInt(b.match(/\d+/)![0], 10))
+      .map((name) => path.join(overlaysDir, name));
+    if (overlayPaths.length > 0) {
+      const coverPath = path.join(VIDEOS_DIR, 'cover.png');
+      await photosFromOverlays(
+        overlayPaths,
+        photosDir,
+        fs.existsSync(coverPath) ? coverPath : undefined
+      );
+    }
+  }
+
   const outDir = archiveOutputs(topic);
 
   console.log('\n' + '='.repeat(50));
   console.log('✅ Daily batch complete');
   console.log(`📁 Saved to: ${outDir}`);
-  console.log('📌 Publish manually on TikTok while developer review is pending');
+  console.log(`🆔 Post id: ${path.basename(outDir)}`);
   console.log('='.repeat(50) + '\n');
 }
 

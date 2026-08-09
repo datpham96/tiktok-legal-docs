@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   let success = 0;
   let failed = 0;
 
-  console.log(`🚀 Bulk batch: ${count} videos (series-only, cx/gpt-5.5-image)`);
+  console.log(`🚀 Bulk batch: ${count} photo posts (series-only, cx/gpt-5.5-image)`);
   console.log(`📋 Log: ${logPath}\n`);
 
   for (let i = 1; i <= count; i++) {

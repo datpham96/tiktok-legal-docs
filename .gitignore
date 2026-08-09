@@ -2,7 +2,11 @@ node_modules/
 dist/
 .env
 tokens.json
+pkce-state.json
 storage/videos/*.mp4
 *.log
 .DS_Store
 storage
+public/media/
+assets/bgm/*.mp3
+!assets/bgm/.gitkeep

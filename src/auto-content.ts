@@ -4,8 +4,18 @@ import path from 'path';
 import { config, validateEnv } from './config';
 import { generateImagesFromScenes } from './image-generator';
 import { generateSlideshowFromImages } from './image-slideshow';
-import { generateCaption } from './router9';
+import { photosFromOverlays } from './photo-assets';
+import { ensureTikTokTipsHashtag, generateCaption } from './router9';
 import { planVideoScenes, saveVideoScript } from './scene-planner';
+
+/** Keep carousel size in {4,6,8}. */
+function snapSceneCount(n: number): number {
+  if ([4, 6, 8].includes(n)) return n;
+  if (!Number.isFinite(n) || n < 4) return 4;
+  if (n === 5 || n === 7) return 6;
+  if (n > 8) return 8;
+  return 6;
+}
 
 function assertNonEmptyFile(filePath: string, label: string): void {
   if (!fs.existsSync(filePath)) {
@@ -32,10 +42,12 @@ function cleanCaption(raw: string): string {
     throw new Error('Caption is empty');
   }
 
-  return text
+  text = text
     .replace(/^```[a-zA-Z]*\n?/, '')
     .replace(/```$/m, '')
     .trim();
+
+  return ensureTikTokTipsHashtag(text);
 }
 
 async function renderOverlayImages(scenesPath: string, imagePaths: string[], outputDir: string): Promise<string[]> {
@@ -88,16 +100,24 @@ function loadExistingSceneImages(imagesDir: string, count: number): string[] {
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2).filter((arg) => arg !== '--reuse-images');
+  const args = process.argv.slice(2).filter(
+    (arg) => arg !== '--reuse-images' && arg !== '--with-video' && arg !== '--photos-only'
+  );
   const reuseImages = process.argv.includes('--reuse-images') || process.env.REUSE_IMAGES === '1';
+  // Photo-first: export JPEGs only. Pass --with-video to also encode MP4.
+  const withVideo =
+    process.argv.includes('--with-video') ||
+    process.env.KEEP_VIDEO === '1' ||
+    process.env.WITH_VIDEO === '1';
   const topic = args[0] || '3 cách dùng AI trong lập trình';
   const sceneCountArg = args[1];
-  const sceneCount = sceneCountArg ? parseInt(sceneCountArg, 10) : 5;
+  const sceneCount = snapSceneCount(sceneCountArg ? parseInt(sceneCountArg, 10) : 6);
 
-  console.log('🚀 TikTok Auto Content Generator\n');
+  console.log('🚀 TikTok Auto Content Generator (photo carousel + optional video)\n');
   console.log('='.repeat(50));
   console.log(`📝 Topic: ${topic}`);
-  console.log(`🎬 Scenes: ${sceneCount} (AI script with title + body content)`);
+  console.log(`🖼️  Scenes: ${sceneCount} (AI script with title + body)`);
+  console.log(`🎞️  Video: ${withVideo ? 'yes' : 'photos only'}`);
   console.log('='.repeat(50));
 
   validateEnv(['ROUTER9_API_KEY']);
@@ -107,8 +127,9 @@ async function main(): Promise<void> {
   const videoPath = path.join(config.storage.videosDir, 'test.mp4');
   const captionPath = path.join(config.storage.videosDir, 'caption.txt');
   const scenesPath = path.join(config.storage.videosDir, 'scenes.json');
+  const photosDir = path.join(config.storage.videosDir, 'photos');
 
-  console.log('\n[STEP 1] Plan video script with AI\n');
+  console.log('\n[STEP 1] Plan script with AI\n');
   const script = await planVideoScenes(topic, sceneCount);
   saveVideoScript(script, scenesPath);
   console.log(`✅ Planned ${script.scenes.length} scenes with detailed content`);
@@ -133,9 +154,20 @@ async function main(): Promise<void> {
   console.log('\n[STEP 3] Render overlays (title + body content)\n');
   const overlayPaths = await renderOverlayImages(scenesPath, imagePaths, overlaysDir);
 
-  console.log('\n[STEP 4] Create slideshow video\n');
-  await generateSlideshowFromImages(overlayPaths, videoPath, 4);
-  assertNonEmptyFile(videoPath, 'Output video');
+  console.log('\n[STEP 4] Export photos (optional archive) + slideshow video\n');
+  if (fs.existsSync(photosDir)) {
+    fs.rmSync(photosDir, { recursive: true, force: true });
+  }
+  const photoPaths = await photosFromOverlays(overlayPaths, photosDir);
+  photoPaths.forEach((p, i) => console.log(`   [${i}] ${p}`));
+
+  if (withVideo) {
+    console.log('\n[STEP 4b] Create slideshow video\n');
+    await generateSlideshowFromImages(overlayPaths, videoPath, 4);
+    assertNonEmptyFile(videoPath, 'Output video');
+  } else if (fs.existsSync(videoPath)) {
+    fs.unlinkSync(videoPath);
+  }
 
   console.log('\n[STEP 5] Generate caption\n');
   const caption = cleanCaption(await generateCaption(topic));
@@ -147,8 +179,9 @@ async function main(): Promise<void> {
   }
 
   console.log('\n' + '='.repeat(50));
-  console.log('✅ COMPLETE! Ready for TikTok\n');
-  console.log(`📹 Video: ${videoPath} (${script.scenes.length} scenes × 4s)`);
+  console.log('✅ COMPLETE! Ready for TikTok PHOTO publish\n');
+  console.log(`🖼️  Photos: ${photosDir} (${photoPaths.length})`);
+  if (withVideo) console.log(`📹 Video (optional): ${videoPath}`);
   console.log(`📄 Script: ${scenesPath}`);
   console.log(`📝 Caption: ${caption}`);
   console.log('='.repeat(50) + '\n');

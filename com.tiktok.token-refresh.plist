@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tiktok.token-refresh</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Library/WebServer/Documents/TIKTOK/scripts/ensure-tiktok-oauth.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Library/WebServer/Documents/TIKTOK</string>
+
+    <!-- Every 6 hours: 00:15, 06:15, 12:15, 18:15 -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>15</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>15</integer></dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>/Library/WebServer/Documents/TIKTOK/logs/token-refresh.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Library/WebServer/Documents/TIKTOK/logs/token-refresh-error.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/masscom/.nvm/versions/node/v24.14.0/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

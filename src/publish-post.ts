@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   console.log(`   Topic: ${meta?.topic || '(none)'}`);
   console.log(`   Privacy: ${privacy}`);
   console.log(`   Cover: ${fs.existsSync(coverPath) ? coverPath : '(none — using video frame)'}`);
-  console.log(`   Auto music: on (TikTok picks suggested track)`);
+  console.log(`   BGM: mux into silent video (TikTok video API cannot auto-pick music)`);
   console.log(`   Caption preview: ${caption.slice(0, 120).replace(/\n/g, ' ')}...`);
 
   const result = await publishVideo({
@@ -52,7 +52,9 @@ async function main(): Promise<void> {
     disableDuet: true,
     disableStitch: true,
     isAigc: true,
-    autoAddMusic: true,
+    muxBgm: true,
+    postId,
+    topic: meta?.topic,
     coverPath: fs.existsSync(coverPath) ? coverPath : undefined
   });
 

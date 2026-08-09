@@ -124,7 +124,7 @@ export async function generateImageWith9Router(
   const {
     prompt,
     outputPath,
-    model = 'cx/gpt-5.5-image',
+    model = 'cx/gpt-5.3-image',
     width = 1024,
     height = 1792
   } = options;

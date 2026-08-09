@@ -2,12 +2,20 @@
 
 ## ✅ Đã setup
 
-Hệ thống tự động **research + tạo video** vào 3 khung giờ mỗi ngày:
-- **07:30** - Buổi sáng
-- **12:30** - Buổi trưa
-- **17:30** - Buổi chiều
+Hệ thống tự động **publish photo carousel công khai** (TikTok `auto_add_music`) vào 3 khung giờ mỗi ngày:
+- **06:30** - Buổi sáng
+- **11:30** - Buổi trưa
+- **16:30** - Buổi chiều
 
-> Trong lúc chờ TikTok Developer duyệt, script **chỉ tạo video + caption + cover** để bạn đăng thủ công. Không auto-publish.
+> Privacy mặc định: `PUBLIC_TO_EVERYONE`.
+> Mỗi slot (×3/ngày) làm **2 việc**:
+> 1. **Đăng** 1 photo từ backlog (thứ tự: numeric ≥73 → dated → legacy 1–69)
+> 2. **Gen** 1 post mới vào kho (`daily-batch`) — **không đăng ngay**, chờ lượt sau
+> → Mỗi ngày: **3 đăng TikTok** + **~3 post mới trong kho** (kho không cạn).
+> Hết backlog mới gen-and-publish cùng lúc.
+> Mỗi post: **6 ảnh JPEG** + `#TikTokTips` + nhạc TikTok (`auto_add_music`).
+> Tắt gen kho tạm: `SKIP_STOCK_GEN=1 ./auto-post.sh`
+> Override privacy: `TIKTOK_PRIVACY=SELF_ONLY ./auto-post.sh`
 
 ## 📂 Files chính
 
@@ -80,7 +88,7 @@ rm ~/Library/LaunchAgents/com.tiktok.autopost.*.plist
 1. **Mac phải bật** vào khung giờ đó
 2. **Localtunnel hoặc Cloudflare Tunnel phải chạy** (cho OAuth callback)
 3. **Access token phải valid** (refresh nếu hết hạn)
-4. **Production credentials** (nếu muốn video lên TikTok thật, không phải sandbox)
+4. **TikTok OAuth đã kết nối** trên `https://autopublisher.click` (token valid)
 
 ## 🔧 Customization
 
@@ -122,8 +130,31 @@ launchctl load ~/Library/LaunchAgents/com.tiktok.autopost.night.plist
 2. Xem log có lỗi gì: `tail logs/autopost-*-error.log`
 3. Test thủ công: `./auto-post.sh`
 
-### Token hết hạn
-Access token TikTok thường có TTL 24h. Nếu hết hạn:
+### Token hết hạn / slot bị miss OAuth
+Access token TikTok ~24h. Hệ thống **tự refresh** qua `getValidTokens()` — không dùng `/api/demo/status` nữa (tránh server cũ trong RAM).
+
+```bash
+# Kiểm tra + refresh token trên VPS (chạy trước mỗi slot)
+./scripts/ensure-tiktok-oauth.sh
+
+# Deploy dist + restart systemd (bắt buộc sau khi sửa code auth)
+./scripts/deploy-production.sh
+
+# LaunchAgent refresh 6h/lần (00:15, 06:15, 12:15, 18:15)
+cp com.tiktok.token-refresh.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.tiktok.token-refresh.plist
+tail -f logs/token-refresh.log
+```
+
+Nếu refresh fail → reconnect: `https://autopublisher.click/auth/tiktok`
+
+### Đăng API ok nhưng 0 view
+Không phải lỗi privacy nếu log có `publicaly_available_post_id` / `tiktok_post_id`:
+- Post **PUBLIC** qua API vẫn có thể **0 FYP views** vì: tài khoản mới, 0 follower, photo carousel (không phải video), nội dung AI slideshow lặp, `is_aigc: true`.
+- Kiểm tra meta sau publish: `storage/videos/posts/<id>/meta.json` → `tiktok_post_ids`.
+- Thử tăng view: post video thay photo, hook caption mạnh hơn, tương tác thủ công 30 phút đầu, verify app **Content Posting API audit** trên TikTok Developer Portal.
+
+### Token hết hạn (cách cũ — chỉ khi refresh_token die)
 ```bash
 # Xóa token cũ
 rm tokens.json

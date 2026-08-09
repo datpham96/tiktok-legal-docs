@@ -1,7 +1,9 @@
 import axios from 'axios';
 import fs from 'fs';
-import { loadTokens } from './tiktok-auth';
+import path from 'path';
+import { getValidTokens } from './tiktok-auth';
 import { bakeCoverIntoVideo } from './video-cover';
+import { pickBgm, muxBackgroundMusic, videoHasAudio } from './video-music';
 
 // TODO: Verify these endpoints with current TikTok Content Posting API docs
 // API version and endpoints may change - check https://developers.tiktok.com/doc/content-posting-api-get-started
@@ -30,6 +32,16 @@ interface PublishOptions {
   coverPath?: string;
   /** Frame used as cover when no custom coverPath is provided. */
   coverTimestampMs?: number;
+  /**
+   * Mux looping BGM into silent videos before upload.
+   * Defaults to true — TikTok video Direct Post cannot auto-pick music.
+   */
+  muxBgm?: boolean;
+  /** Optional path to BGM file; defaults to rotating pick from assets/bgm/. */
+  musicPath?: string;
+  /** Used to rotate BGM with less repetition. */
+  postId?: string;
+  topic?: string;
   onProgress?: (stage: 'uploading' | 'publishing' | 'processing', detail?: string) => void;
 }
 
@@ -129,8 +141,33 @@ export interface PublishResult {
   publishId: string;
   status: string;
   failReason?: string;
+  /** TikTok public post IDs when status is PUBLISH_COMPLETE (confirms public visibility). */
+  publicPostIds?: string[];
   statusHistory: PublishStatusEvent[];
   message: string;
+}
+
+/** Pick a privacy level allowed by creator_info (TikTok UX requirement). */
+export function resolvePrivacyLevel(
+  options: string[],
+  preferred: PrivacyLevel = 'PUBLIC_TO_EVERYONE'
+): PrivacyLevel {
+  const allowed = new Set(options);
+  if (allowed.has(preferred)) {
+    return preferred;
+  }
+  const fallbacks: PrivacyLevel[] = [
+    'PUBLIC_TO_EVERYONE',
+    'FOLLOWER_OF_CREATOR',
+    'MUTUAL_FOLLOW_FRIENDS',
+    'SELF_ONLY'
+  ];
+  for (const level of fallbacks) {
+    if (allowed.has(level)) {
+      return level;
+    }
+  }
+  throw new Error(`No allowed privacy level in creator_info: ${options.join(', ') || '(empty)'}`);
 }
 
 // Status values returned by /v2/post/publish/status/fetch/
@@ -154,10 +191,9 @@ export async function publishVideo(options: PublishOptions): Promise<PublishResu
   console.log(`   Video: ${options.videoPath}`);
   console.log(`   Caption: ${options.caption}`);
   console.log(`   Privacy: ${options.privacy}`);
-  console.log(`   Auto music: ${options.autoAddMusic !== false ? 'on' : 'off'}`);
+  console.log(`   Mux BGM: ${options.muxBgm !== false ? 'on' : 'off'} (video API cannot auto-pick TikTok music)`);
 
-  // Load access token
-  const tokenData = loadTokens();
+  const tokenData = await getValidTokens();
   if (!tokenData) {
     throw new Error('No valid access token found. Please run OAuth flow first: npm run dev');
   }
@@ -166,6 +202,7 @@ export async function publishVideo(options: PublishOptions): Promise<PublishResu
   let uploadVideoPath = options.videoPath;
   let coverTimestampMs = options.coverTimestampMs ?? 1000;
   let tempCoverDir: string | undefined;
+  let tempMusicPath: string | undefined;
 
   try {
     if (options.coverPath && fs.existsSync(options.coverPath)) {
@@ -177,13 +214,37 @@ export async function publishVideo(options: PublishOptions): Promise<PublishResu
       console.log(`   Using cover.png → video_cover_timestamp_ms=${coverTimestampMs}`);
     }
 
+    if (options.muxBgm !== false) {
+      const alreadyHasAudio = await videoHasAudio(uploadVideoPath);
+      if (alreadyHasAudio) {
+        console.log('\n🎵 Video already has audio — skipping BGM mux');
+      } else {
+        console.log('\n🎵 Muxing background music (slideshow has no audio track)...');
+        let musicPath = options.musicPath;
+        let musicName = musicPath ? path.basename(musicPath) : '';
+        if (!musicPath) {
+          const picked = await pickBgm({
+            postId: options.postId,
+            topic: options.topic || options.caption.slice(0, 80)
+          });
+          musicPath = picked.path;
+          musicName = picked.name;
+        }
+        tempMusicPath = await muxBackgroundMusic(uploadVideoPath, musicPath);
+        uploadVideoPath = tempMusicPath;
+        console.log(`   BGM: ${musicName} (${musicPath})`);
+      }
+    }
+
     // Step 1: Initialize upload
     console.log('\n📤 Step 1: Initialize upload...');
     options.onProgress?.('uploading');
     const initResponse = await initializeUpload(accessToken, {
       ...options,
       videoPath: uploadVideoPath,
-      coverTimestampMs
+      coverTimestampMs,
+      // auto_add_music is ignored for video Direct Post; keep false to avoid confusion
+      autoAddMusic: false
     });
 
     const { publish_id, upload_url } = initResponse.data;
@@ -233,6 +294,9 @@ export async function publishVideo(options: PublishOptions): Promise<PublishResu
     if (tempCoverDir && fs.existsSync(tempCoverDir)) {
       fs.rmSync(tempCoverDir, { recursive: true, force: true });
     }
+    if (tempMusicPath && fs.existsSync(tempMusicPath)) {
+      fs.unlinkSync(tempMusicPath);
+    }
   }
 }
 
@@ -261,7 +325,7 @@ export async function publishPhotoPost(options: PhotoPublishOptions): Promise<Pu
   console.log(`   Privacy: ${options.privacy}`);
   console.log(`   Auto music: ${options.autoAddMusic !== false ? 'on' : 'off'}`);
 
-  const tokenData = loadTokens();
+  const tokenData = await getValidTokens();
   if (!tokenData) {
     throw new Error('No valid access token found. Please run OAuth flow first.');
   }
@@ -271,6 +335,16 @@ export async function publishPhotoPost(options: PhotoPublishOptions): Promise<Pu
   }
 
   const accessToken = tokenData.access_token;
+  const creator = await queryCreatorInfo(accessToken);
+  const privacy = resolvePrivacyLevel(creator.privacyLevelOptions, options.privacy);
+  if (privacy !== options.privacy) {
+    console.warn(
+      `⚠️ Privacy ${options.privacy} not in creator options — using ${privacy} (${creator.privacyLevelOptions.join(', ')})`
+    );
+  } else {
+    console.log(`   Creator @${creator.creatorUsername} — privacy options: ${creator.privacyLevelOptions.join(', ')}`);
+  }
+
   const lines = options.caption.trim().split(/\n+/).map((l) => l.trim()).filter(Boolean);
   const title = (lines[0] || 'AutoPublisher').slice(0, 90);
   const description = options.caption.trim().slice(0, 4000);
@@ -286,7 +360,7 @@ export async function publishPhotoPost(options: PhotoPublishOptions): Promise<Pu
         post_info: {
           title,
           description,
-          privacy_level: options.privacy,
+          privacy_level: privacy,
           disable_comment: options.disableComment || false,
           auto_add_music: options.autoAddMusic !== false,
           brand_content_toggle: options.brandContentToggle || false,
@@ -458,11 +532,20 @@ async function pollPublishStatus(
     console.log(`   Poll #${attempt}: publish_id=${publishId} status=${lastStatus}`);
 
     if (lastStatus === STATUS_COMPLETE) {
+      const publicPostIds = data.publicaly_available_post_id?.filter(Boolean);
+      if (publicPostIds?.length) {
+        console.log(`   ✅ Public post ID(s): ${publicPostIds.join(', ')}`);
+      } else {
+        console.warn('   ⚠️ PUBLISH_COMPLETE but no publicaly_available_post_id — check TikTok app visibility');
+      }
       return {
         publishId,
         status: lastStatus,
+        publicPostIds,
         statusHistory,
-        message: 'Video published successfully (PUBLISH_COMPLETE).'
+        message: publicPostIds?.length
+          ? `Published publicly (PUBLISH_COMPLETE). TikTok post ID: ${publicPostIds[0]}`
+          : 'Published (PUBLISH_COMPLETE) — public post ID not returned yet.'
       };
     }
 

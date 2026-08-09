@@ -20,7 +20,7 @@ function extractJson(text: string): any {
 }
 
 export async function planVideoScenes(topic: string, sceneCount?: number): Promise<VideoScript> {
-  const targetScenes = sceneCount ?? 5;
+  const targetScenes = sceneCount ?? 6;
 
   const prompt = `Bạn là chuyên gia viết kịch bản TikTok giáo dục bằng TIẾNG VIỆT cho creator mới tìm hiểu AI.
 
