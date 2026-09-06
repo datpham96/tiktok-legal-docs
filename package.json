@@ -22,6 +22,7 @@
     "publish-post": "ts-node src/publish-post.ts",
     "publish-photo-post": "ts-node src/publish-photo-post.ts",
     "prepare-bgm": "ts-node src/prepare-bgm.ts",
+    "import-bgm": "bash scripts/import-bgm.sh",
     "backlog": "ts-node src/backlog.ts",
     "convert-posts-to-photos": "ts-node src/convert-posts-to-photos.ts",
     "check-videos": "ts-node src/check-videos.ts",

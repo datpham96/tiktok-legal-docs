@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.tiktok.autopost.evening</string>
+    <string>com.tiktok.autopost.night</string>
 
     <key>ProgramArguments</key>
     <array>
@@ -17,16 +17,16 @@
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
-        <integer>16</integer>
+        <integer>20</integer>
         <key>Minute</key>
-        <integer>30</integer>
+        <integer>0</integer>
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Library/WebServer/Documents/TIKTOK/logs/autopost-evening.log</string>
+    <string>/Library/WebServer/Documents/TIKTOK/logs/autopost-night.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Library/WebServer/Documents/TIKTOK/logs/autopost-evening-error.log</string>
+    <string>/Library/WebServer/Documents/TIKTOK/logs/autopost-night-error.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>

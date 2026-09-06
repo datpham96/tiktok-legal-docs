@@ -13,7 +13,9 @@ export function snapPhotoCount(n: number): number {
   const raw = Math.round(n);
   if ((PREFERRED_PHOTO_COUNTS as readonly number[]).includes(raw)) return raw;
   if (!Number.isFinite(raw) || raw < 4) return 4;
-  if (raw === 5 || raw === 7) return 6; // bias toward the middle sweet spot
+  if (raw === 5) return 6;
+  // cover + 6 scenes = 7 → prefer 8 (pad last) over dropping a real tip slide
+  if (raw === 7) return 8;
   if (raw > 8) return 8;
   return DEFAULT_PHOTO_COUNT;
 }

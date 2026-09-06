@@ -1,0 +1,47 @@
+{
+  "note": "HoliznaCC0 CC0 pack — closer to TikTok photo-mode (phonk + modern lo-fi). Old FMA 2010s tracks archived to assets/bgm/_deprecated/.",
+  "tracks": [
+    {
+      "file": "01-phonk-remix.mp3",
+      "title": "Phonk Remix",
+      "artist": "HoliznaCC0",
+      "vibe": "phonk, bass, gần nhạc nền TikTok VN",
+      "license": "CC0"
+    },
+    {
+      "file": "02-phonk-ish.mp3",
+      "title": "Phonk ish",
+      "artist": "HoliznaCC0",
+      "vibe": "phonk ngắn, năng",
+      "license": "CC0"
+    },
+    {
+      "file": "03-only-human-phonk.mp3",
+      "title": "ONLY HUMAN",
+      "artist": "HoliznaCC0",
+      "vibe": "phonk dài hơn, drift/aura",
+      "license": "CC0"
+    },
+    {
+      "file": "04-pantheon-phonk.mp3",
+      "title": "Pantheon",
+      "artist": "HoliznaCC0",
+      "vibe": "phonk nặng hơn",
+      "license": "CC0"
+    },
+    {
+      "file": "05-roof-tops-lofi.mp3",
+      "title": "Roof Tops",
+      "artist": "HoliznaCC0",
+      "vibe": "lo-fi 2020s, slideshow",
+      "license": "CC0"
+    },
+    {
+      "file": "06-faded-sunlight-lofi.mp3",
+      "title": "Faded in the Sunlight",
+      "artist": "HoliznaCC0",
+      "vibe": "lo-fi summer, nhẹ hơn phonk",
+      "license": "CC0"
+    }
+  ]
+}

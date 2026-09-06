@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { getValidTokens } from './tiktok-auth';
 import { bakeCoverIntoVideo } from './video-cover';
-import { pickBgm, muxBackgroundMusic, videoHasAudio } from './video-music';
+import { pickBgm, muxBackgroundMusic, muxSilentAudio, videoHasAudio } from './video-music';
 
 // TODO: Verify these endpoints with current TikTok Content Posting API docs
 // API version and endpoints may change - check https://developers.tiktok.com/doc/content-posting-api-get-started
@@ -34,9 +34,17 @@ interface PublishOptions {
   coverTimestampMs?: number;
   /**
    * Mux looping BGM into silent videos before upload.
-   * Defaults to true — TikTok video Direct Post cannot auto-pick music.
+   * Defaults to true for Direct Post. Set false when the creator will add
+   * TikTok music in the app (inbox / MEDIA_UPLOAD).
    */
   muxBgm?: boolean;
+  /**
+   * Send to TikTok inbox instead of Direct Post so the creator can pick
+   * a trending sound and tap Publish in the app.
+   */
+  toInbox?: boolean;
+  /** Cover + silent audio already baked; skip ffmpeg on the server. */
+  skipMediaPrep?: boolean;
   /** Optional path to BGM file; defaults to rotating pick from assets/bgm/. */
   musicPath?: string;
   /** Used to rotate BGM with less repetition. */
@@ -191,7 +199,8 @@ export async function publishVideo(options: PublishOptions): Promise<PublishResu
   console.log(`   Video: ${options.videoPath}`);
   console.log(`   Caption: ${options.caption}`);
   console.log(`   Privacy: ${options.privacy}`);
-  console.log(`   Mux BGM: ${options.muxBgm !== false ? 'on' : 'off'} (video API cannot auto-pick TikTok music)`);
+  console.log(`   Mode: ${options.toInbox ? 'INBOX (add music in TikTok app)' : 'DIRECT_POST'}`);
+  console.log(`   Mux BGM: ${options.muxBgm !== false && !options.toInbox ? 'on' : 'off'}`);
 
   const tokenData = await getValidTokens();
   if (!tokenData) {
@@ -205,35 +214,44 @@ export async function publishVideo(options: PublishOptions): Promise<PublishResu
   let tempMusicPath: string | undefined;
 
   try {
-    if (options.coverPath && fs.existsSync(options.coverPath)) {
-      console.log('\n🖼️  Baking cover.png (~1.5s + keyframes) for TikTok profile thumbnail...');
-      const baked = await bakeCoverIntoVideo(options.videoPath, options.coverPath);
-      uploadVideoPath = baked.videoPath;
-      coverTimestampMs = baked.coverTimestampMs;
-      tempCoverDir = baked.tempPath;
-      console.log(`   Using cover.png → video_cover_timestamp_ms=${coverTimestampMs}`);
-    }
-
-    if (options.muxBgm !== false) {
-      const alreadyHasAudio = await videoHasAudio(uploadVideoPath);
-      if (alreadyHasAudio) {
-        console.log('\n🎵 Video already has audio — skipping BGM mux');
-      } else {
-        console.log('\n🎵 Muxing background music (slideshow has no audio track)...');
-        let musicPath = options.musicPath;
-        let musicName = musicPath ? path.basename(musicPath) : '';
-        if (!musicPath) {
-          const picked = await pickBgm({
-            postId: options.postId,
-            topic: options.topic || options.caption.slice(0, 80)
-          });
-          musicPath = picked.path;
-          musicName = picked.name;
-        }
-        tempMusicPath = await muxBackgroundMusic(uploadVideoPath, musicPath);
-        uploadVideoPath = tempMusicPath;
-        console.log(`   BGM: ${musicName} (${musicPath})`);
+    if (!options.skipMediaPrep) {
+      if (options.coverPath && fs.existsSync(options.coverPath)) {
+        console.log('\n🖼️  Baking cover.png (~1.5s + keyframes) for TikTok profile thumbnail...');
+        const baked = await bakeCoverIntoVideo(options.videoPath, options.coverPath);
+        uploadVideoPath = baked.videoPath;
+        coverTimestampMs = baked.coverTimestampMs;
+        tempCoverDir = baked.tempPath;
+        console.log(`   Using cover.png → video_cover_timestamp_ms=${coverTimestampMs}`);
       }
+
+      const shouldMuxBgm = options.muxBgm !== false && !options.toInbox;
+      if (shouldMuxBgm) {
+        const alreadyHasAudio = await videoHasAudio(uploadVideoPath);
+        if (alreadyHasAudio) {
+          console.log('\n🎵 Video already has audio — skipping BGM mux');
+        } else {
+          console.log('\n🎵 Muxing background music (slideshow has no audio track)...');
+          let musicPath = options.musicPath;
+          let musicName = musicPath ? path.basename(musicPath) : '';
+          if (!musicPath) {
+            const picked = await pickBgm({
+              postId: options.postId,
+              topic: options.topic || options.caption.slice(0, 80)
+            });
+            musicPath = picked.path;
+            musicName = picked.name;
+          }
+          tempMusicPath = await muxBackgroundMusic(uploadVideoPath, musicPath);
+          uploadVideoPath = tempMusicPath;
+          console.log(`   BGM: ${musicName} (${musicPath})`);
+        }
+      } else if (!(await videoHasAudio(uploadVideoPath))) {
+        console.log('\n🔇 No music — adding silent audio so TikTok accepts the file');
+        tempMusicPath = await muxSilentAudio(uploadVideoPath);
+        uploadVideoPath = tempMusicPath;
+      }
+    } else {
+      console.log('\n📌 skipMediaPrep — using pre-baked video (cover + audio already in file)');
     }
 
     // Step 1: Initialize upload
@@ -425,9 +443,60 @@ async function initializeUpload(
   accessToken: string,
   options: PublishOptions
 ): Promise<InitUploadResponse> {
-  // Get video file size
   const stats = fs.statSync(options.videoPath);
   const fileSizeBytes = stats.size;
+  const sourceInfo = {
+    source: 'FILE_UPLOAD',
+    video_size: fileSizeBytes,
+    chunk_size: fileSizeBytes,
+    total_chunk_count: 1
+  };
+
+  if (options.toInbox) {
+    console.log('   Endpoint: /post/publish/inbox/video/init/ (add music in TikTok app)');
+    const title = options.caption.trim().slice(0, 2200);
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json; charset=UTF-8'
+    };
+    const sourceOnly = { source_info: sourceInfo };
+    const withTitle = {
+      post_info: {
+        title,
+        video_cover_timestamp_ms: options.coverTimestampMs ?? 1000
+      },
+      source_info: sourceInfo
+    };
+
+    let response;
+    try {
+      response = await axios.post<InitUploadResponse>(
+        `${TIKTOK_API_BASE}/${API_VERSION}/post/publish/inbox/video/init/`,
+        withTitle,
+        { headers }
+      );
+      if (response.data.error && response.data.error.code !== 'ok') {
+        throw new Error(response.data.error.code);
+      }
+    } catch (err: any) {
+      console.warn(
+        `   Inbox init with title failed (${err.response?.data?.error?.code || err.message}) — retrying source_info only`
+      );
+      response = await axios.post<InitUploadResponse>(
+        `${TIKTOK_API_BASE}/${API_VERSION}/post/publish/inbox/video/init/`,
+        sourceOnly,
+        { headers }
+      );
+    }
+
+    if (response.data.error && response.data.error.code !== 'ok') {
+      throw new Error(`Inbox init error: ${response.data.error.code} - ${response.data.error.message}`);
+    }
+    if (!response.data.data?.publish_id || !response.data.data?.upload_url) {
+      throw new Error(`Inbox init missing publish_id/upload_url: ${JSON.stringify(response.data)}`);
+    }
+    return response.data;
+  }
 
   // Direct Post (scope video.publish). The inbox endpoint accepts only
   // source_info, so the post settings the user picks in the UI — caption,
@@ -444,15 +513,10 @@ async function initializeUpload(
         brand_content_toggle: options.brandContentToggle || false,
         brand_organic_toggle: options.brandOrganicToggle || false,
         is_aigc: options.isAigc || false,
-        auto_add_music: options.autoAddMusic !== false,
+        auto_add_music: options.autoAddMusic === true,
         video_cover_timestamp_ms: options.coverTimestampMs ?? 1000
       },
-      source_info: {
-        source: 'FILE_UPLOAD',
-        video_size: fileSizeBytes,
-        chunk_size: fileSizeBytes,
-        total_chunk_count: 1
-      }
+      source_info: sourceInfo
     },
     {
       headers: {

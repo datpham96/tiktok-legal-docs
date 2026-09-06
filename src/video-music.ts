@@ -6,8 +6,8 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 
-/** Royalty-free demo pack (SoundHelix 1–16). Drop your own .mp3 into assets/bgm/ anytime. */
-const BGM_PACK: Array<{ name: string; url: string }> = Array.from({ length: 16 }, (_, i) => {
+/** Legacy SoundHelix pack — robotic demo tracks; skipped unless BGM_ALLOW_HELIX=1. */
+const LEGACY_HELIX_PACK: Array<{ name: string; url: string }> = Array.from({ length: 16 }, (_, i) => {
   const n = i + 1;
   return {
     name: `${String(n).padStart(2, '0')}-helix-${n}.mp3`,
@@ -15,8 +15,39 @@ const BGM_PACK: Array<{ name: string; url: string }> = Array.from({ length: 16 }
   };
 });
 
-const DEFAULT_BGM_URL =
-  process.env.BGM_URL || BGM_PACK[7].url;
+function allowHelixTracks(): boolean {
+  return process.env.BGM_ALLOW_HELIX === '1';
+}
+
+function bgmVolume(): number {
+  const raw = parseFloat(process.env.BGM_VOLUME || '0.32');
+  if (!Number.isFinite(raw)) return 0.32;
+  return Math.min(1, Math.max(0.05, raw));
+}
+
+function isHelixTrack(filePath: string): boolean {
+  return /helix/i.test(path.basename(filePath));
+}
+
+/** Move SoundHelix files out of rotation into assets/bgm/_deprecated/. */
+export function archiveLegacyHelixTracks(rootDir = process.cwd()): number {
+  const dir = bgmDir(rootDir);
+  const destDir = path.join(dir, '_deprecated');
+  fs.mkdirSync(destDir, { recursive: true });
+  if (!fs.existsSync(dir)) return 0;
+
+  let moved = 0;
+  for (const name of fs.readdirSync(dir)) {
+    if (!/\.mp3$/i.test(name)) continue;
+    if (!isHelixTrack(name) && name.toLowerCase() !== 'default.mp3') continue;
+    const src = path.join(dir, name);
+    const dest = path.join(destDir, name);
+    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    fs.renameSync(src, dest);
+    moved += 1;
+  }
+  return moved;
+}
 
 type BgmHistoryEntry = {
   file: string;
@@ -38,12 +69,23 @@ export function bgmDir(rootDir = process.cwd()): string {
   return path.join(rootDir, 'assets', 'bgm');
 }
 
+export function customBgmDir(rootDir = process.cwd()): string {
+  return path.join(bgmDir(rootDir), 'custom');
+}
+
 export function bgmHistoryPath(rootDir = process.cwd()): string {
   return path.join(rootDir, 'storage', 'bgm-history.json');
 }
 
-export function defaultBgmPath(): string {
-  return process.env.BGM_PATH || path.join(bgmDir(), '08-helix-8.mp3');
+export function defaultBgmPath(rootDir = process.cwd()): string {
+  if (process.env.BGM_PATH && fs.existsSync(process.env.BGM_PATH)) {
+    return process.env.BGM_PATH;
+  }
+  const custom = listBgmFiles(rootDir).find((p) => p.includes(`${path.sep}custom${path.sep}`));
+  if (custom) return custom;
+  const any = listBgmFiles(rootDir)[0];
+  if (any) return any;
+  return path.join(bgmDir(rootDir), 'custom', 'add-your-tracks-here.mp3');
 }
 
 function avoidRecentCount(): number {
@@ -52,18 +94,39 @@ function avoidRecentCount(): number {
 }
 
 export function listBgmFiles(rootDir = process.cwd()): string[] {
-  const dir = bgmDir(rootDir);
-  if (!fs.existsSync(dir)) return [];
-  const all = fs
-    .readdirSync(dir)
-    .filter((name) => /\.mp3$/i.test(name))
-    .sort()
-    .map((name) => path.join(dir, name))
-    .filter((p) => fs.statSync(p).size > 10_000);
+  const dirs = [customBgmDir(rootDir), bgmDir(rootDir)];
+  const seen = new Set<string>();
+  const files: string[] = [];
 
-  // Prefer numbered pack tracks; skip legacy default.mp3 alias when others exist
-  const withoutDefault = all.filter((p) => path.basename(p).toLowerCase() !== 'default.mp3');
-  return withoutDefault.length > 0 ? withoutDefault : all;
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    for (const name of fs.readdirSync(dir)) {
+      if (!/\.mp3$/i.test(name)) continue;
+      const full = path.join(dir, name);
+      if (seen.has(full) || fs.statSync(full).size < 10_000) continue;
+      seen.add(full);
+      files.push(full);
+    }
+  }
+
+  const sorted = files.sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
+  const withoutDefault = sorted.filter((p) => path.basename(p).toLowerCase() !== 'default.mp3');
+
+  let candidates = withoutDefault.length > 0 ? withoutDefault : sorted;
+  if (!allowHelixTracks()) {
+    const nonHelix = candidates.filter((p) => !isHelixTrack(p));
+    if (nonHelix.length > 0) candidates = nonHelix;
+  }
+
+  // custom/ tracks first
+  candidates.sort((a, b) => {
+    const aCustom = a.includes(`${path.sep}custom${path.sep}`) ? 0 : 1;
+    const bCustom = b.includes(`${path.sep}custom${path.sep}`) ? 0 : 1;
+    if (aCustom !== bCustom) return aCustom - bCustom;
+    return path.basename(a).localeCompare(path.basename(b));
+  });
+
+  return candidates;
 }
 
 function loadHistory(rootDir = process.cwd()): BgmHistory {
@@ -107,30 +170,29 @@ function stableIndex(seed: string, modulo: number): number {
 }
 
 /**
- * Download starter BGM pack into assets/bgm/ (skips files that already exist).
- * Drop your own .mp3 files in the same folder — they are picked automatically.
+ * Ensure BGM folder exists. Legacy SoundHelix only downloads if BGM_ALLOW_HELIX=1.
+ * Prefer: drop .mp3 into assets/bgm/custom/ or run ./scripts/import-bgm.sh
  */
 export async function ensureBgmLibrary(rootDir = process.cwd()): Promise<string[]> {
   const dir = bgmDir(rootDir);
+  const custom = customBgmDir(rootDir);
   fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(custom, { recursive: true });
 
-  for (const track of BGM_PACK) {
-    const dest = path.join(dir, track.name);
-    if (fs.existsSync(dest) && fs.statSync(dest).size > 10_000) continue;
-    console.log(`🎵 Downloading BGM ${track.name}...`);
-    await downloadFile(track.url, dest);
-  }
-
-  // Keep legacy default.mp3 as alias of helix-8 if missing
-  const legacy = path.join(dir, 'default.mp3');
-  const helix8 = path.join(dir, '08-helix-8.mp3');
-  if (!fs.existsSync(legacy) && fs.existsSync(helix8)) {
-    fs.copyFileSync(helix8, legacy);
+  if (allowHelixTracks()) {
+    for (const track of LEGACY_HELIX_PACK) {
+      const dest = path.join(dir, track.name);
+      if (fs.existsSync(dest) && fs.statSync(dest).size > 10_000) continue;
+      console.log(`🎵 Downloading legacy BGM ${track.name}...`);
+      await downloadFile(track.url, dest);
+    }
   }
 
   const files = listBgmFiles(rootDir);
   if (files.length === 0) {
-    throw new Error(`No BGM files in ${dir}. Add .mp3 files or check network download.`);
+    throw new Error(
+      `No BGM in ${custom}/ — tải nhạc từ mixkit.co hoặc pixabay.com/music rồi chạy: ./scripts/import-bgm.sh ~/Downloads/*.mp3`
+    );
   }
   return files;
 }
@@ -226,6 +288,7 @@ export async function muxBackgroundMusic(
     outputPath ||
     path.join(os.tmpdir(), `tiktok-bgm-${Date.now()}.mp4`);
 
+  const vol = bgmVolume();
   await runFfmpeg([
     '-y',
     '-i', videoPath,
@@ -235,8 +298,40 @@ export async function muxBackgroundMusic(
     '-map', '0:v:0',
     '-map', '1:a:0',
     '-c:v', 'copy',
+    '-filter:a', `volume=${vol},afade=t=in:st=0:d=1`,
     '-c:a', 'aac',
     '-b:a', '128k',
+    '-movflags', '+faststart',
+    out
+  ]);
+
+  return out;
+}
+
+/**
+ * Add a silent AAC track so TikTok accepts the file. Creator can overlay
+ * a trending sound in the TikTok editor (inbox flow).
+ */
+export async function muxSilentAudio(
+  videoPath: string,
+  outputPath?: string
+): Promise<string> {
+  if (!fs.existsSync(videoPath)) {
+    throw new Error(`Video not found: ${videoPath}`);
+  }
+  const out =
+    outputPath ||
+    path.join(os.tmpdir(), `tiktok-silent-${Date.now()}.mp4`);
+
+  await runFfmpeg([
+    '-y',
+    '-i', videoPath,
+    '-f', 'lavfi',
+    '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    '-c:v', 'copy',
+    '-c:a', 'aac',
+    '-b:a', '64k',
+    '-shortest',
     '-movflags', '+faststart',
     out
   ]);

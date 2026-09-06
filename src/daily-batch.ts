@@ -14,6 +14,13 @@ type SeriesFile = {
   last_index: number;
 };
 
+type ExistingPostRecord = {
+  id: string;
+  topic: string;
+  normalized: string;
+  tokens: Set<string>;
+};
+
 function loadSeries(): SeriesFile {
   if (!fs.existsSync(SERIES_FILE)) {
     return { niche: 'AI cho creator', topics: ['AI giúp creator làm content nhanh hơn'], last_index: -1 };
@@ -25,20 +32,152 @@ function saveSeries(series: SeriesFile): void {
   fs.writeFileSync(SERIES_FILE, `${JSON.stringify(series, null, 2)}\n`, 'utf8');
 }
 
-function nextSeriesTopic(series: SeriesFile): string {
-  const nextIndex = (series.last_index + 1) % series.topics.length;
-  series.last_index = nextIndex;
-  saveSeries(series);
-  return series.topics[nextIndex];
+function normalizeTopic(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function topicTokens(text: string): Set<string> {
+  const stopwords = new Set([
+    'ai',
+    'cho',
+    'va',
+    'và',
+    'cua',
+    'của',
+    'the',
+    'la',
+    'là',
+    'tren',
+    'trên',
+    'voi',
+    'với',
+    'khi',
+    'nao',
+    'nào',
+    'cac',
+    'các',
+    'mot',
+    'một',
+    'nhung',
+    'những',
+    'bang',
+    'bằng',
+    'de',
+    'để',
+    'tu',
+    'từ',
+    'den',
+    'đến',
+    'trong',
+    'cho',
+    'creator',
+    'tiktok',
+  ]);
+
+  return new Set(
+    normalizeTopic(text)
+      .split(' ')
+      .filter((token) => token.length >= 3 && !stopwords.has(token))
+  );
+}
+
+function overlapCount(a: Set<string>, b: Set<string>): number {
+  let count = 0;
+  for (const token of a) {
+    if (b.has(token)) count += 1;
+  }
+  return count;
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  const overlap = overlapCount(a, b);
+  const union = new Set([...a, ...b]).size;
+  return union === 0 ? 0 : overlap / union;
+}
+
+function loadExistingPostRecords(): ExistingPostRecord[] {
+  if (!fs.existsSync(POSTS_DIR)) return [];
+
+  return fs
+    .readdirSync(POSTS_DIR)
+    .map((id) => {
+      const metaPath = path.join(POSTS_DIR, id, 'meta.json');
+      if (!fs.existsSync(metaPath)) return null;
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { topic?: string };
+        const topic = String(meta.topic || '').trim();
+        if (!topic) return null;
+        return {
+          id,
+          topic,
+          normalized: normalizeTopic(topic),
+          tokens: topicTokens(topic),
+        } satisfies ExistingPostRecord;
+      } catch {
+        return null;
+      }
+    })
+    .filter((record): record is ExistingPostRecord => Boolean(record));
+}
+
+function findSimilarTopic(candidate: string, existing: ExistingPostRecord[]): ExistingPostRecord | null {
+  const normalized = normalizeTopic(candidate);
+  const tokens = topicTokens(candidate);
+
+  for (const record of existing) {
+    if (record.normalized === normalized) return record;
+    if (normalized.includes(record.normalized) || record.normalized.includes(normalized)) return record;
+
+    const overlap = overlapCount(tokens, record.tokens);
+    const similarity = jaccardSimilarity(tokens, record.tokens);
+    if (overlap >= 4 && similarity >= 0.6) return record;
+  }
+
+  return null;
+}
+
+function nextSeriesTopic(series: SeriesFile, existing: ExistingPostRecord[]): string {
+  if (series.topics.length === 0) {
+    throw new Error('No topics configured in content-series.json');
+  }
+
+  for (let attempt = 0; attempt < series.topics.length; attempt += 1) {
+    const nextIndex = (series.last_index + 1 + attempt) % series.topics.length;
+    const candidate = series.topics[nextIndex];
+    const duplicate = findSimilarTopic(candidate, existing);
+    if (duplicate) {
+      console.log(`⏭️  Skip similar topic: "${candidate}" (close to post ${duplicate.id})`);
+      continue;
+    }
+
+    series.last_index = nextIndex;
+    saveSeries(series);
+    return candidate;
+  }
+
+  throw new Error('All configured series topics are too similar to existing posts. Add more topics first.');
 }
 
 async function pickTopic(manualTopic?: string): Promise<string> {
+  const existing = loadExistingPostRecords();
   if (manualTopic?.trim()) {
-    return manualTopic.trim();
+    const topic = manualTopic.trim();
+    const duplicate = findSimilarTopic(topic, existing);
+    if (duplicate) {
+      throw new Error(`Manual topic too similar to post ${duplicate.id}: "${duplicate.topic}"`);
+    }
+    return topic;
   }
 
   const series = loadSeries();
-  const baseTopic = nextSeriesTopic(series);
+  const baseTopic = nextSeriesTopic(series, existing);
 
   if (process.env.SERIES_ONLY === '1') {
     return baseTopic;
@@ -205,15 +344,37 @@ async function main(): Promise<void> {
   const scenesPath = path.join(VIDEOS_DIR, 'scenes.json');
   runCover(scenesPath);
 
-  // Rebuild photo set from overlays (4/6/8 scenes — first scene is cover)
+  // Rebuild photo set from THIS run's overlays only (match scenes.json).
+  // Do NOT glob all scene_*.png — stale scene_7/8 leftovers become off-topic last slides.
   const overlaysDir = path.join(process.cwd(), 'images', 'overlays');
   const photosDir = path.join(VIDEOS_DIR, 'photos');
+  let sceneCount = 6;
+  if (fs.existsSync(scenesPath)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(scenesPath, 'utf8')) as { scenes?: unknown[] };
+      if (Array.isArray(raw.scenes) && raw.scenes.length > 0) {
+        sceneCount = raw.scenes.length;
+      }
+    } catch {
+      // keep default
+    }
+  }
+
   if (fs.existsSync(overlaysDir)) {
-    const overlayPaths = fs
-      .readdirSync(overlaysDir)
-      .filter((name) => /^scene_\d+\.png$/.test(name))
-      .sort((a, b) => parseInt(a.match(/\d+/)![0], 10) - parseInt(b.match(/\d+/)![0], 10))
-      .map((name) => path.join(overlaysDir, name));
+    const overlayPaths: string[] = [];
+    for (let i = 1; i <= sceneCount; i++) {
+      const p = path.join(overlaysDir, `scene_${i}.png`);
+      if (fs.existsSync(p)) overlayPaths.push(p);
+    }
+    // Remove leftover overlays from older runs (e.g. scene_7.png branding)
+    for (const name of fs.readdirSync(overlaysDir)) {
+      const m = name.match(/^scene_(\d+)\.png$/i);
+      if (!m) continue;
+      if (parseInt(m[1], 10) > sceneCount) {
+        fs.unlinkSync(path.join(overlaysDir, name));
+        console.log(`🧹 Removed stale overlay ${name}`);
+      }
+    }
     if (overlayPaths.length > 0) {
       const coverPath = path.join(VIDEOS_DIR, 'cover.png');
       await photosFromOverlays(

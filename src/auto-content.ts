@@ -70,6 +70,14 @@ async function renderOverlayImages(scenesPath: string, imagePaths: string[], out
       const overlayPaths = imagePaths.map((_, index) => path.join(outputDir, `scene_${index + 1}.png`));
 
       try {
+        // Drop leftover overlays from previous runs (scene_7+, branding slides, etc.)
+        for (const name of fs.readdirSync(outputDir)) {
+          const m = name.match(/^scene_(\d+)\.png$/i);
+          if (!m) continue;
+          if (parseInt(m[1], 10) > imagePaths.length) {
+            fs.unlinkSync(path.join(outputDir, name));
+          }
+        }
         overlayPaths.forEach((overlayPath, index) => {
           assertNonEmptyFile(overlayPath, `Overlay image ${index + 1}`);
         });

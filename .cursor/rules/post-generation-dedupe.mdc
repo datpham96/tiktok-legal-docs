@@ -1,0 +1,19 @@
+---
+description: Avoid duplicate TikTok post topics and near-duplicate ideas
+alwaysApply: true
+---
+
+# Post Generation Dedupe
+
+When generating, editing, or batch-planning TikTok posts for this repo:
+
+- Always check existing posts in `storage/videos/posts/*/meta.json` before creating a new post.
+- Avoid both exact duplicates and near-duplicates. Treat topics with the same core intent, angle, or keyword cluster as duplicates even if wording differs.
+- If a requested or generated topic is too similar to an existing post, skip it and choose a fresher angle instead of rephrasing the same idea.
+- Prefer extending the series with new subtopics, new examples, new formats, or a different stage of the creator workflow.
+- When touching the generation pipeline, preserve or improve duplicate-screening logic in `src/daily-batch.ts`.
+
+Examples:
+
+- Avoid creating both "Cách dùng AI đọc TikTok Analytics" and "Nhờ AI phân tích TikTok Analytics để chọn video tiếp theo" unless the second has a clearly different outcome and audience need.
+- Avoid reusing generic endings or branding slides that make multiple posts feel repeated.

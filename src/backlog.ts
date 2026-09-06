@@ -5,15 +5,27 @@ import { generateSlideshowFromImages } from './image-slideshow';
 import { hasCoverSlide, injectCoverPhoto, listPostPhotoFiles, photosFromVideoPost, postCoverPath } from './photo-assets';
 
 /** Priority numeric posts start here (already-published tests sit below). */
-const DEFAULT_MIN_ID = parseInt(process.env.BACKLOG_MIN_ID || '73', 10);
+const DEFAULT_MIN_ID = parseInt(process.env.BACKLOG_MIN_ID || '91', 10);
+
+/**
+ * photo  = Direct Post photo carousel (auto_add_music), skip if published_at
+ * inbox  = video → TikTok inbox (default), skip if inbox_sent_at
+ */
+const PUBLISH_MODE = (process.env.PUBLISH_MODE || 'inbox').toLowerCase();
 
 const DATED_RE = /^\d{4}-\d{2}-\d{2}-/;
 const NUMERIC_RE = /^\d+$/;
+
+function isEligible(postDir: string): boolean {
+  return PUBLISH_MODE === 'photo' ? canPublishPost(postDir) : canInboxPost(postDir);
+}
 
 export type PostMeta = Record<string, unknown> & {
   published_at?: string;
   publish_id?: string;
   privacy?: string;
+  inbox_sent_at?: string;
+  inbox_publish_id?: string;
 };
 
 export function postsRoot(): string {
@@ -40,6 +52,22 @@ export function isPublished(postDir: string): boolean {
   return Boolean(meta.published_at || meta.publish_id);
 }
 
+export function isInboxSent(postDir: string): boolean {
+  const meta = loadMeta(postDir);
+  return Boolean(meta.inbox_sent_at || meta.inbox_publish_id);
+}
+
+/** Ready for video inbox (caption + photos/video), even if already photo-published. */
+export function canInboxPost(postDir: string): boolean {
+  if (!fs.existsSync(postDir)) return false;
+  if (isInboxSent(postDir)) return false;
+  const caption = path.join(postDir, 'caption.txt');
+  if (!fs.existsSync(caption)) return false;
+  const photos = listPostPhotoFiles(postDir);
+  if (photos.length >= 4) return true;
+  return fs.existsSync(path.join(postDir, 'video.mp4'));
+}
+
 export function canPublishPost(postDir: string): boolean {
   if (!fs.existsSync(postDir)) return false;
   if (isPublished(postDir)) return false;
@@ -57,12 +85,12 @@ function listDirNames(): string[] {
   return fs.readdirSync(root);
 }
 
-/** Priority: numeric ids >= minId, ascending. */
+/** Priority: numeric ids >= minId, not yet published/sent. */
 export function listPriorityBacklogIds(minId = DEFAULT_MIN_ID): string[] {
   return listDirNames()
     .filter((name) => NUMERIC_RE.test(name) && parseInt(name, 10) >= minId)
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
-    .filter((id) => canPublishPost(path.join(postsRoot(), id)));
+    .filter((id) => isEligible(path.join(postsRoot(), id)));
 }
 
 /** Dated daily-batch folders (2026-07-21-054030-noon), chronological. */
@@ -70,22 +98,24 @@ export function listDatedBacklogIds(): string[] {
   return listDirNames()
     .filter((name) => DATED_RE.test(name))
     .sort()
-    .filter((id) => canPublishPost(path.join(postsRoot(), id)));
+    .filter((id) => isEligible(path.join(postsRoot(), id)));
 }
 
 /** Legacy numeric posts below minId (1 … minId-1), ascending. */
 export function listLegacyBacklogIds(minId = DEFAULT_MIN_ID): string[] {
+  // Photo mode starts at minId only — never fall back to older test posts.
+  if (PUBLISH_MODE === 'photo') return [];
   return listDirNames()
     .filter((name) => NUMERIC_RE.test(name) && parseInt(name, 10) < minId)
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
-    .filter((id) => canPublishPost(path.join(postsRoot(), id)));
+    .filter((id) => isEligible(path.join(postsRoot(), id)));
 }
 
 /**
- * Full backlog order:
- *   1) numeric >= minId (73→122…)
- *   2) dated folders (Jul 21 → Aug 1…)
- *   3) legacy numeric < minId (1→72 unpublished)
+ * Queue order:
+ *   1) numeric >= minId
+ *   2) dated folders
+ *   3) legacy numeric < minId (inbox mode only)
  */
 export function listBacklogPostIds(minId = DEFAULT_MIN_ID): string[] {
   return [
@@ -132,6 +162,23 @@ export function markPostPublished(
   meta.format = detail.format || 'photo';
   meta.publish_source = 'backlog';
   meta.auto_add_music = true;
+  saveMeta(postDir, meta);
+}
+
+export function markPostInboxSent(
+  postId: string,
+  detail: {
+    publishId?: string;
+    privacy?: string;
+  }
+): void {
+  const postDir = path.join(postsRoot(), postId);
+  const meta = loadMeta(postDir);
+  meta.inbox_sent_at = new Date().toISOString();
+  if (detail.publishId) meta.inbox_publish_id = detail.publishId;
+  if (detail.privacy) meta.privacy = detail.privacy;
+  meta.format = 'video-inbox';
+  meta.publish_source = 'backlog';
   saveMeta(postDir, meta);
 }
 
@@ -200,7 +247,7 @@ async function main(): Promise<void> {
     console.log(ids.join('\n'));
     const b = backlogBreakdown();
     console.error(
-      `# ${b.total} unpublished (priority>=${DEFAULT_MIN_ID}: ${b.priority}, dated: ${b.dated}, legacy: ${b.legacy})`
+      `# ${b.total} ${PUBLISH_MODE}-pending (priority>=${DEFAULT_MIN_ID}: ${b.priority}, dated: ${b.dated}, legacy: ${b.legacy})`
     );
     return;
   }

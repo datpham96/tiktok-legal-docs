@@ -10,3 +10,5 @@ storage
 public/media/
 assets/bgm/*.mp3
 !assets/bgm/.gitkeep
+!assets/bgm/custom/.gitkeep
+assets/bgm/_deprecated/

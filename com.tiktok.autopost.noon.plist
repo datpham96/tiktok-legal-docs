@@ -32,6 +32,12 @@
     <dict>
         <key>PATH</key>
         <string>/Users/masscom/.nvm/versions/node/v24.14.0/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>BACKLOG_MIN_ID</key>
+        <string>123</string>
+        <key>PUBLISH_MODE</key>
+        <string>photo</string>
+        <key>SKIP_STOCK_GEN</key>
+        <string>0</string>
     </dict>
 </dict>
 </plist>

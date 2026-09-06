@@ -2,20 +2,20 @@
 
 ## ✅ Đã setup
 
-Hệ thống tự động **publish photo carousel công khai** (TikTok `auto_add_music`) vào 3 khung giờ mỗi ngày:
+Hệ thống tự động **đăng PHOTO carousel** (slide ảnh + nhạc TikTok gợi ý) vào 4 khung giờ mỗi ngày:
 - **06:30** - Buổi sáng
 - **11:30** - Buổi trưa
 - **16:30** - Buổi chiều
+- **20:00** - Buổi tối
 
-> Privacy mặc định: `PUBLIC_TO_EVERYONE`.
-> Mỗi slot (×3/ngày) làm **2 việc**:
-> 1. **Đăng** 1 photo từ backlog (thứ tự: numeric ≥73 → dated → legacy 1–69)
+> Queue bắt đầu từ **post 123** (`BACKLOG_MIN_ID=123`, `PUBLISH_MODE=photo`).
+> Mỗi slot (×4/ngày) làm **2 việc**:
+> 1. **Đăng PHOTO** 1 post từ backlog (numeric ≥123, chưa `published_at`)
 > 2. **Gen** 1 post mới vào kho (`daily-batch`) — **không đăng ngay**, chờ lượt sau
-> → Mỗi ngày: **3 đăng TikTok** + **~3 post mới trong kho** (kho không cạn).
-> Hết backlog mới gen-and-publish cùng lúc.
-> Mỗi post: **6 ảnh JPEG** + `#TikTokTips` + nhạc TikTok (`auto_add_music`).
+> → Mỗi ngày: **4 photo posts** + **~4 post mới trong kho**.
+> Mac rsync `photos/` + caption lên VPS → `publish-photo-post.js` với **`auto_add_music: true`** (TikTok chọn nhạc suggested/phổ biến cho photo — API không cho chọn đúng 1 bài từ profile).
 > Tắt gen kho tạm: `SKIP_STOCK_GEN=1 ./auto-post.sh`
-> Override privacy: `TIKTOK_PRIVACY=SELF_ONLY ./auto-post.sh`
+> Quay lại inbox video: `PUBLISH_MODE=inbox BACKLOG_MIN_ID=91 ./auto-post.sh`
 
 ## 📂 Files chính
 
@@ -56,6 +56,9 @@ tail -f logs/autopost-noon.log
 
 # Log buổi chiều
 tail -f logs/autopost-evening.log
+
+# Log 20:00
+tail -f logs/autopost-night.log
 ```
 
 ### Test ngay (không đợi đến giờ)
@@ -65,16 +68,12 @@ tail -f logs/autopost-evening.log
 
 ### Tắt scheduler (tạm ngừng)
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.tiktok.autopost.morning.plist
-launchctl unload ~/Library/LaunchAgents/com.tiktok.autopost.noon.plist
-launchctl unload ~/Library/LaunchAgents/com.tiktok.autopost.evening.plist
+./scripts/pause-autopost.sh
 ```
 
 ### Bật lại scheduler
 ```bash
-launchctl load ~/Library/LaunchAgents/com.tiktok.autopost.morning.plist
-launchctl load ~/Library/LaunchAgents/com.tiktok.autopost.noon.plist
-launchctl load ~/Library/LaunchAgents/com.tiktok.autopost.evening.plist
+./scripts/resume-autopost.sh
 ```
 
 ### Xóa hoàn toàn scheduler
